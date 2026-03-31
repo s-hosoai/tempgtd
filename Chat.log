@@ -1,0 +1,116 @@
+# Chat Log — GTD Task Tool 仕様策定セッション
+# Date: 2026-04-01
+# Model: claude-sonnet-4-6
+# Purpose: Claudeを使った仕様策定の事例記録
+
+---
+
+## [User]
+
+GTDに沿ったTaskツールを作成しようと思います．まずは仕様を固めたいのでCLAUDE.mdのひな型を作成して下さい
+
+---
+
+## [Assistant]
+
+GTDベースのTaskツールの仕様をまとめるCLAUDE.mdを作成します。
+
+**実行した操作:**
+1. `ls /home/hosoai/mono/tempgtd/` でディレクトリの状態を確認
+2. `Write` ツールで `/home/hosoai/mono/tempgtd/CLAUDE.md` を作成
+
+**CLAUDE.mdの構成:**
+- GTDの5ステップ（Capture→Clarify→Organize→Reflect→Engage）を明示
+- データモデル: Task / Project / ListType（inbox, next, project, waiting, someday, reference）
+- コアルール: 2分ルール、Next Actionは動詞始まり、Inbox Zeroなど
+- CLIインターフェース案: `gtd add`, `gtd process`, `gtd next --context @pc` など
+- 週次レビューのフロー
+- 未決定事項: 技術スタックや機能の検討ポイント
+
+特に議論が必要な点として未決定事項にまとめています。優先的に固めたい箇所（データストアの形式、UI方針、言語選定など）があれば教えてください。
+
+---
+
+## [User]
+
+今回の事例はClaudeの使い方の説明としても使いたいため，この会話のログを適切な形式でChat.logとして残してください．
+
+---
+
+## [Assistant]
+
+`Write` ツールで `/home/hosoai/mono/tempgtd/Chat.log` を作成。（本ファイル）
+
+---
+
+## 解説: このセッションで使ったClaudeの使い方
+
+### ポイント1: 最初のプロンプトで「目的＋成果物」を明示する
+
+```
+❌ 「GTDツールを作りたい」
+✓  「GTDに沿ったTaskツールを作成しようと思います．まずは仕様を固めたいので
+     CLAUDE.mdのひな型を作成して下さい」
+```
+
+「何を作るか（GTDツール）」と「今何が欲しいか（CLAUDE.mdのひな型）」を分けて伝えると、
+Claudeは実装ではなく仕様策定フェーズにフォーカスできる。
+
+### ポイント2: CLAUDE.md を仕様書として使う
+
+`CLAUDE.md` はClaude Codeが自動的に読み込むプロジェクト設定ファイル。
+仕様・コンテキスト・未決定事項をここに書いておくと、
+次回以降の会話でClaudeが同じ前提を共有した状態でスタートできる。
+
+```
+プロジェクトルート/
+├── CLAUDE.md    ← Claudeへの指示・仕様・コンテキストをここに集約
+├── src/
+└── ...
+```
+
+### ポイント3: 未決定事項を明示的に残す
+
+Claudeは決まっていないことを「それっぽく埋める」傾向がある。
+`## 未決定事項（要議論）` セクションを設けることで、
+「まだ決めていないこと」をClaudeと共有し、勝手に決めさせない。
+
+### ポイント4: 段階的に仕様を固める
+
+一度に全部決めようとしない。
+今回のセッションでは「ひな型」だけ作り、
+技術スタックや詳細機能は次のセッションで議論する形にした。
+これがClaudeとの協働の基本スタイル。
+
+---
+
+## [User]
+
+以降は会話ごとにChat.logの更新をお願いします．
+まずはGit Initでリポジトリを作成してください．
+
+---
+
+## [Assistant]
+
+**実行した操作:**
+1. `git init` で `/home/hosoai/mono/tempgtd/` にリポジトリを初期化（ブランチ名: `master`）
+2. 本Chat.logを更新
+
+**確認事項:** ブランチ名を `main` に変更するか確認 → ユーザーが承認。
+
+---
+
+## [User]
+
+はい，Global設定で変更してください．
+
+---
+
+## [Assistant]
+
+**実行した操作:**
+1. `git config --global init.defaultBranch main` — 今後の `git init` で `main` がデフォルトに
+2. `git branch -m main` — 現リポジトリのブランチ名を `master` → `main` に変更
+
+---
