@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(source ~/.bashrc)",
+      "Bash(cp /home/hosoai/mono/tempgtd/CLAUDE.md /tmp/gtd-backup/)",
+      "Bash(cp /home/hosoai/mono/tempgtd/Chat.log /tmp/gtd-backup/)"
+    ],
+    "additionalDirectories": [
+      "/tmp/gtd-backup"
+    ]
+  }
+}
