@@ -57,25 +57,24 @@ export function GlobalCapture() {
   return (
     <form
       onSubmit={handleSubmit}
-      className="mt-auto border-t px-3 py-3 space-y-2 bg-white"
+      className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-md px-4 py-3 flex items-center gap-3 z-50"
     >
       <input
         ref={inputRef}
         value={title}
         onChange={(e) => setTitle(e.target.value)}
-        placeholder="Capture..."
-        className="w-full text-sm px-2 py-1.5 border rounded focus:outline-none focus:ring-1 focus:ring-blue-400"
+        placeholder="Capture... (Enter で追加)"
+        className="flex-1 text-sm px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
         disabled={busy}
       />
       {pageStatus && pageStatus !== "inbox" && (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           <Switch
             id="direct"
             checked={direct}
             onCheckedChange={setDirect}
-            className="scale-75 origin-left"
           />
-          <label htmlFor="direct" className="text-xs text-gray-500 cursor-pointer select-none">
+          <label htmlFor="direct" className="text-sm text-gray-500 cursor-pointer select-none whitespace-nowrap">
             {direct ? (
               <span className="text-blue-600 font-medium">{STATUS_LABEL[pageStatus]} へ</span>
             ) : (
