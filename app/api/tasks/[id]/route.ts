@@ -6,8 +6,10 @@ import { tasks, type Task } from "@/lib/db/schema"
 
 const UpdateTaskSchema = z.object({
   title: z.string().min(1).optional(),
-  status: z.enum(["inbox", "next", "done", "cancelled"]).optional(),
+  status: z.enum(["inbox", "next", "delegate", "waiting", "someday", "done", "cancelled"]).optional(),
   notes: z.string().optional(),
+  projectId: z.number().nullable().optional(),
+  waitingFor: z.string().nullable().optional(),
   twoMinute: z.boolean().optional(), // trueなら next_order=0（先頭）
 })
 
@@ -24,15 +26,15 @@ export async function PATCH(
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
   }
 
+  const { twoMinute, ...fields } = parsed.data
   const updates: Partial<typeof tasks.$inferInsert> = {
-    ...parsed.data,
+    ...fields,
     updatedAt: Date.now(),
   }
-  delete (updates as { twoMinute?: boolean }).twoMinute
 
-  // nextへ移動する場合のnext_order計算
+  // next へ移動する場合の next_order 計算
   if (parsed.data.status === "next") {
-    if (parsed.data.twoMinute) {
+    if (twoMinute) {
       updates.nextOrder = 0
     } else {
       const [result] = await db
@@ -61,9 +63,10 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
-  const taskId = parseInt(id)
-
-  await db.update(tasks).set({ status: "cancelled", updatedAt: Date.now() }).where(eq(tasks.id, taskId))
+  await db
+    .update(tasks)
+    .set({ status: "cancelled", updatedAt: Date.now() })
+    .where(eq(tasks.id, parseInt(id)))
 
   return new NextResponse(null, { status: 204 })
 }

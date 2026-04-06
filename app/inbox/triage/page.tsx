@@ -4,12 +4,14 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
+import { Input } from "@/components/ui/input"
 import type { Task } from "@/lib/db/schema"
 
 export default function TriagePage() {
   const [tasks, setTasks] = useState<Task[]>([])
   const [current, setCurrent] = useState<Task | null>(null)
   const [notes, setNotes] = useState("")
+  const [waitingFor, setWaitingFor] = useState("")
   const [loading, setLoading] = useState(true)
   const router = useRouter()
 
@@ -19,17 +21,26 @@ export default function TriagePage() {
     setTasks(data)
     setCurrent(data[0] ?? null)
     setNotes(data[0]?.notes ?? "")
+    setWaitingFor("")
     setLoading(false)
   }
 
   useEffect(() => { loadTasks() }, [])
 
-  async function handleAction(status: "next" | "done" | "cancelled", twoMinute = false) {
+  async function handleAction(
+    status: "next" | "delegate" | "waiting" | "someday" | "done" | "cancelled",
+    twoMinute = false
+  ) {
     if (!current) return
     await fetch(`/api/tasks/${current.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status, notes, twoMinute }),
+      body: JSON.stringify({
+        status,
+        notes,
+        twoMinute,
+        waitingFor: (status === "waiting" || status === "delegate") ? waitingFor || null : null,
+      }),
     })
     await loadTasks()
   }
@@ -48,18 +59,15 @@ export default function TriagePage() {
     )
   }
 
-  const remaining = tasks.length
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Triage</h1>
-        <span className="text-sm text-gray-500">{remaining} 件</span>
+        <span className="text-sm text-gray-500">{tasks.length} 件</span>
       </div>
 
       <div className="bg-white rounded-xl border p-6 space-y-4">
         <p className="text-lg font-medium">{current.title}</p>
-
         <Textarea
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
@@ -78,12 +86,37 @@ export default function TriagePage() {
           2分でできる → 今すぐやる（Next先頭へ）
         </Button>
 
-        <Button
-          className="w-full"
-          onClick={() => handleAction("next", false)}
-        >
+        <Button className="w-full" onClick={() => handleAction("next", false)}>
           Next Action へ
         </Button>
+
+        <Button variant="outline" className="w-full" onClick={() => handleAction("someday")}>
+          Someday/Maybe へ
+        </Button>
+
+        <div className="space-y-1">
+          <Input
+            value={waitingFor}
+            onChange={(e) => setWaitingFor(e.target.value)}
+            placeholder="誰に委譲 / 何を待つか"
+          />
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={() => handleAction("delegate")}
+            >
+              Delegate（委譲予定）
+            </Button>
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={() => handleAction("waiting")}
+            >
+              Waiting For
+            </Button>
+          </div>
+        </div>
 
         <Button
           variant="outline"

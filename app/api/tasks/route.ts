@@ -6,34 +6,41 @@ import { tasks, type Task } from "@/lib/db/schema"
 import { generateId } from "@/lib/id"
 import { runMigrations } from "@/lib/db/migrate"
 
-runMigrations()
+let migrated = false
+function ensureMigrated() {
+  if (!migrated) { runMigrations(); migrated = true }
+}
 
 const CreateTaskSchema = z.object({
   title: z.string().min(1),
   notes: z.string().optional(),
   parentId: z.number().optional(),
+  projectId: z.number().optional(),
 })
 
 export async function GET(request: NextRequest) {
+  ensureMigrated()
   const { searchParams } = new URL(request.url)
   const status = searchParams.get("status")
+  const projectId = searchParams.get("projectId")
 
-  const rows = status
-    ? await db
-        .select()
-        .from(tasks)
-        .where(eq(tasks.status, status as "inbox" | "next" | "done" | "cancelled"))
-        .orderBy(
-          status === "next"
-            ? asc(tasks.nextOrder)
-            : desc(tasks.createdAt)
-        )
-    : await db.select().from(tasks).orderBy(desc(tasks.createdAt))
+  let query = db.select().from(tasks).$dynamic()
+
+  if (status) {
+    query = query.where(eq(tasks.status, status as Task["status"]))
+  }
+  if (projectId) {
+    query = query.where(eq(tasks.projectId, parseInt(projectId)))
+  }
+
+  const orderBy = status === "next" ? asc(tasks.nextOrder) : desc(tasks.createdAt)
+  const rows = await query.orderBy(orderBy)
 
   return NextResponse.json(rows)
 }
 
 export async function POST(request: NextRequest) {
+  ensureMigrated()
   const body = await request.json()
   const parsed = CreateTaskSchema.safeParse(body)
   if (!parsed.success) {
@@ -41,14 +48,14 @@ export async function POST(request: NextRequest) {
   }
 
   const now = Date.now()
-  const id = generateId()
   const result = await db
     .insert(tasks)
     .values({
-      id,
+      id: generateId(),
       title: parsed.data.title,
       notes: parsed.data.notes ?? "",
       parentId: parsed.data.parentId ?? null,
+      projectId: parsed.data.projectId ?? null,
       status: "inbox",
       createdAt: now,
       updatedAt: now,

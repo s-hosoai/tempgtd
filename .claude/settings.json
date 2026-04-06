@@ -6,7 +6,8 @@
       "Bash(cp /home/hosoai/mono/tempgtd/Chat.log /tmp/gtd-backup/)"
     ],
     "additionalDirectories": [
-      "/tmp/gtd-backup"
+      "/tmp/gtd-backup",
+      "/home/hosoai/mono/tempgtd/app/api/projects"
     ]
   }
 }
