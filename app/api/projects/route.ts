@@ -4,13 +4,6 @@ import { z } from "zod"
 import { db } from "@/lib/db"
 import { projects, tasks, type Project } from "@/lib/db/schema"
 import { generateId } from "@/lib/id"
-import { runMigrations } from "@/lib/db/migrate"
-
-let migrated = false
-function ensureMigrated() {
-  if (!migrated) { runMigrations(); migrated = true }
-}
-
 const CreateProjectSchema = z.object({
   title: z.string().min(1),
   outcome: z.string().optional(),
@@ -18,7 +11,6 @@ const CreateProjectSchema = z.object({
 })
 
 export async function GET(request: NextRequest) {
-  ensureMigrated()
   const { searchParams } = new URL(request.url)
   const status = searchParams.get("status") ?? "active"
 
@@ -48,7 +40,6 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  ensureMigrated()
   const body = await request.json()
   const parsed = CreateProjectSchema.safeParse(body)
   if (!parsed.success) {

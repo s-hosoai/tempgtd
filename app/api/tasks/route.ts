@@ -4,13 +4,6 @@ import { z } from "zod"
 import { db } from "@/lib/db"
 import { tasks, type Task } from "@/lib/db/schema"
 import { generateId } from "@/lib/id"
-import { runMigrations } from "@/lib/db/migrate"
-
-let migrated = false
-function ensureMigrated() {
-  if (!migrated) { runMigrations(); migrated = true }
-}
-
 const CreateTaskSchema = z.object({
   title: z.string().min(1),
   notes: z.string().optional(),
@@ -19,7 +12,6 @@ const CreateTaskSchema = z.object({
 })
 
 export async function GET(request: NextRequest) {
-  ensureMigrated()
   const { searchParams } = new URL(request.url)
   const status = searchParams.get("status")
   const projectId = searchParams.get("projectId")
@@ -40,7 +32,6 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  ensureMigrated()
   const body = await request.json()
   const parsed = CreateTaskSchema.safeParse(body)
   if (!parsed.success) {
