@@ -115,7 +115,7 @@ export default function TodayPage() {
                 <div
                   key={i}
                   className={`flex border-b last:border-b-0 min-h-[40px] ${
-                    isContinue ? "opacity-0 pointer-events-none h-0 min-h-0 border-0" : ""
+                    isContinue ? "hidden" : ""
                   }`}
                   onDragOver={(e) => { e.preventDefault() }}
                   onDrop={(e) => {
@@ -128,7 +128,10 @@ export default function TodayPage() {
                   </div>
                   {isStart && task ? (
                     <div
-                      className={`flex-1 px-2 py-1 m-1 rounded text-xs border ${ENERGY_COLOR[task.energy ?? "mid"] ?? "bg-gray-100"}`}
+                      draggable
+                      onDragStart={() => setDragging(task)}
+                      onDragEnd={() => setDragging(null)}
+                      className={`flex-1 px-2 py-1 m-1 rounded text-xs border cursor-grab active:cursor-grabbing ${ENERGY_COLOR[task.energy ?? "mid"] ?? "bg-gray-100"}`}
                       style={{ minHeight: `${Math.max(1, Math.ceil(task.durationMin / SLOT_MIN)) * 40 - 8}px` }}
                     >
                       <div className="flex items-start justify-between gap-1">
