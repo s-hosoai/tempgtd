@@ -10,20 +10,36 @@ export const metadata: Metadata = {
   description: "Getting Things Done",
 }
 
+const NAV_ITEMS = [
+  { href: "/inbox",        label: "Inbox" },
+  { href: "/inbox/triage", label: "Triage" },
+  { href: "/next-actions", label: "Next Actions" },
+  { href: "/projects",     label: "Projects" },
+  { href: "/delegate",     label: "Delegate" },
+  { href: "/waiting",      label: "Waiting" },
+  { href: "/someday",      label: "Someday" },
+  { href: "/done",         label: "Done" },
+]
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ja">
-      <body className={`${geist.className} bg-gray-50 text-gray-900`}>
-        <header className="border-b bg-white px-6 py-3 flex flex-wrap gap-x-6 gap-y-1 text-sm font-medium">
-          <Link href="/" className="text-blue-600 hover:underline">GTD</Link>
-          <Link href="/inbox" className="hover:underline">Inbox</Link>
-          <Link href="/next-actions" className="hover:underline">Next</Link>
-          <Link href="/projects" className="hover:underline">Projects</Link>
-          <Link href="/delegate" className="hover:underline">Delegate</Link>
-          <Link href="/waiting" className="hover:underline">Waiting</Link>
-          <Link href="/someday" className="hover:underline">Someday</Link>
-        </header>
-        <main className="max-w-2xl mx-auto px-4 py-8">{children}</main>
+      <body className={`${geist.className} bg-gray-50 text-gray-900 flex min-h-screen`}>
+        <nav className="w-48 shrink-0 bg-white border-r flex flex-col py-4">
+          <Link href="/" className="px-4 py-2 text-base font-bold text-blue-600 hover:text-blue-700 mb-2">
+            GTD
+          </Link>
+          {NAV_ITEMS.map(({ href, label }) => (
+            <Link
+              key={href}
+              href={href}
+              className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900"
+            >
+              {label}
+            </Link>
+          ))}
+        </nav>
+        <main className="flex-1 px-8 py-8 max-w-2xl">{children}</main>
       </body>
     </html>
   )

@@ -25,7 +25,11 @@ export async function GET(request: NextRequest) {
     query = query.where(eq(tasks.projectId, parseInt(projectId)))
   }
 
-  const orderBy = status === "next" ? asc(tasks.nextOrder) : desc(tasks.createdAt)
+  const orderBy =
+    status === "next"    ? asc(tasks.nextOrder) :
+    status === "inbox"   ? asc(tasks.createdAt) :  // 古い順（トリアージ用）
+    status === "done"    ? desc(tasks.updatedAt) :  // 完了日時の新しい順
+                           desc(tasks.createdAt)
   const rows = await query.orderBy(orderBy)
 
   return NextResponse.json(rows)
