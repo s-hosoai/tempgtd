@@ -6,11 +6,17 @@ import { tasks, type Task } from "@/lib/db/schema"
 
 const UpdateTaskSchema = z.object({
   title: z.string().min(1).optional(),
-  status: z.enum(["inbox", "next", "delegate", "waiting", "someday", "done", "cancelled"]).optional(),
+  status: z.enum(["inbox", "next", "delegate", "waiting", "scheduled", "someday", "done", "cancelled"]).optional(),
   notes: z.string().optional(),
   projectId: z.number().nullable().optional(),
   waitingFor: z.string().nullable().optional(),
-  twoMinute: z.boolean().optional(), // trueなら next_order=0（先頭）
+  scheduledAt: z.number().nullable().optional(),
+  todayStart: z.number().nullable().optional(),
+  durationMin: z.number().optional(),
+  context: z.string().optional(),  // JSON配列文字列
+  tags: z.string().optional(),     // JSON配列文字列
+  energy: z.enum(["low", "mid", "high"]).nullable().optional(),
+  twoMinute: z.boolean().optional(),
 })
 
 export async function PATCH(
@@ -32,7 +38,6 @@ export async function PATCH(
     updatedAt: Date.now(),
   }
 
-  // next へ移動する場合の next_order 計算
   if (parsed.data.status === "next") {
     if (twoMinute) {
       updates.nextOrder = 0

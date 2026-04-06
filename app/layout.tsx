@@ -14,11 +14,13 @@ const NAV_ITEMS = [
   { href: "/inbox",        label: "Inbox" },
   { href: "/inbox/triage", label: "Triage" },
   { href: "/next-actions", label: "Next Actions" },
+  { href: "/today",        label: "Today" },
   { href: "/projects",     label: "Projects" },
   { href: "/delegate",     label: "Delegate" },
   { href: "/waiting",      label: "Waiting" },
   { href: "/someday",      label: "Someday" },
   { href: "/done",         label: "Done" },
+  { href: "/review",       label: "Review" },
 ]
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

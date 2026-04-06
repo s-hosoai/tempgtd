@@ -12,6 +12,7 @@ export default function TriagePage() {
   const [current, setCurrent] = useState<Task | null>(null)
   const [notes, setNotes] = useState("")
   const [waitingFor, setWaitingFor] = useState("")
+  const [scheduledDate, setScheduledDate] = useState("")
   const [loading, setLoading] = useState(true)
   const router = useRouter()
 
@@ -22,25 +23,28 @@ export default function TriagePage() {
     setCurrent(data[0] ?? null)
     setNotes(data[0]?.notes ?? "")
     setWaitingFor("")
+    setScheduledDate("")
     setLoading(false)
   }
 
   useEffect(() => { loadTasks() }, [])
 
   async function handleAction(
-    status: "next" | "delegate" | "waiting" | "someday" | "done" | "cancelled",
+    status: "next" | "delegate" | "waiting" | "scheduled" | "someday" | "done" | "cancelled",
     twoMinute = false
   ) {
     if (!current) return
+    const body: Record<string, unknown> = { status, notes, twoMinute }
+    if (status === "waiting" || status === "delegate") {
+      body.waitingFor = waitingFor || null
+    }
+    if (status === "scheduled" && scheduledDate) {
+      body.scheduledAt = new Date(scheduledDate).getTime()
+    }
     await fetch(`/api/tasks/${current.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        status,
-        notes,
-        twoMinute,
-        waitingFor: (status === "waiting" || status === "delegate") ? waitingFor || null : null,
-      }),
+      body: JSON.stringify(body),
     })
     await loadTasks()
   }
@@ -90,6 +94,22 @@ export default function TriagePage() {
           Next Action へ
         </Button>
 
+        <div className="space-y-1">
+          <Input
+            type="datetime-local"
+            value={scheduledDate}
+            onChange={(e) => setScheduledDate(e.target.value)}
+          />
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={() => handleAction("scheduled")}
+            disabled={!scheduledDate}
+          >
+            指定日時に Next へ（Scheduled）
+          </Button>
+        </div>
+
         <Button variant="outline" className="w-full" onClick={() => handleAction("someday")}>
           Someday/Maybe へ
         </Button>
@@ -101,28 +121,16 @@ export default function TriagePage() {
             placeholder="誰に委譲 / 何を待つか"
           />
           <div className="flex gap-2">
-            <Button
-              variant="outline"
-              className="flex-1"
-              onClick={() => handleAction("delegate")}
-            >
+            <Button variant="outline" className="flex-1" onClick={() => handleAction("delegate")}>
               Delegate（委譲予定）
             </Button>
-            <Button
-              variant="outline"
-              className="flex-1"
-              onClick={() => handleAction("waiting")}
-            >
+            <Button variant="outline" className="flex-1" onClick={() => handleAction("waiting")}>
               Waiting For
             </Button>
           </div>
         </div>
 
-        <Button
-          variant="outline"
-          className="w-full"
-          onClick={() => handleAction("done")}
-        >
+        <Button variant="outline" className="w-full" onClick={() => handleAction("done")}>
           完了済み / 参照のみ
         </Button>
 

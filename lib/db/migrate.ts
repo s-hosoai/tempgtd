@@ -19,45 +19,54 @@ export function runMigrations() {
       created_at  INTEGER NOT NULL,
       updated_at  INTEGER NOT NULL
     );
-
     CREATE INDEX IF NOT EXISTS idx_projects_status ON projects(status);
-  `)
 
-  // tasks テーブル: Phase 1から既存の場合はカラム追加
-  sqlite.exec(`
     CREATE TABLE IF NOT EXISTS tasks (
-      id           INTEGER PRIMARY KEY,
-      title        TEXT NOT NULL,
-      status       TEXT NOT NULL DEFAULT 'inbox'
-                   CHECK(status IN ('inbox','next','delegate','waiting','someday','done','cancelled')),
-      parent_id    INTEGER REFERENCES tasks(id),
-      project_id   INTEGER REFERENCES projects(id),
-      next_order   REAL,
-      waiting_for  TEXT,
-      notes        TEXT NOT NULL DEFAULT '',
-      created_at   INTEGER NOT NULL,
-      updated_at   INTEGER NOT NULL
+      id            INTEGER PRIMARY KEY,
+      title         TEXT NOT NULL,
+      status        TEXT NOT NULL DEFAULT 'inbox'
+                    CHECK(status IN ('inbox','next','delegate','waiting','scheduled','someday','done','cancelled')),
+      parent_id     INTEGER REFERENCES tasks(id),
+      project_id    INTEGER REFERENCES projects(id),
+      next_order    REAL,
+      waiting_for   TEXT,
+      scheduled_at  INTEGER,
+      today_start   INTEGER,
+      duration_min  INTEGER NOT NULL DEFAULT 30,
+      context       TEXT NOT NULL DEFAULT '',
+      tags          TEXT NOT NULL DEFAULT '',
+      energy        TEXT CHECK(energy IN ('low','mid','high')),
+      notes         TEXT NOT NULL DEFAULT '',
+      created_at    INTEGER NOT NULL,
+      updated_at    INTEGER NOT NULL
     );
-
-    CREATE INDEX IF NOT EXISTS idx_tasks_status     ON tasks(status);
-    CREATE INDEX IF NOT EXISTS idx_tasks_parent_id  ON tasks(parent_id);
-    CREATE INDEX IF NOT EXISTS idx_tasks_project_id ON tasks(project_id);
-    CREATE INDEX IF NOT EXISTS idx_tasks_next_order ON tasks(next_order);
+    CREATE INDEX IF NOT EXISTS idx_tasks_status      ON tasks(status);
+    CREATE INDEX IF NOT EXISTS idx_tasks_parent_id   ON tasks(parent_id);
+    CREATE INDEX IF NOT EXISTS idx_tasks_project_id  ON tasks(project_id);
+    CREATE INDEX IF NOT EXISTS idx_tasks_next_order  ON tasks(next_order);
+    CREATE INDEX IF NOT EXISTS idx_tasks_scheduled   ON tasks(scheduled_at);
+    CREATE INDEX IF NOT EXISTS idx_tasks_today_start ON tasks(today_start);
   `)
 
-  // Phase 1 DBからの移行: カラムが不足している場合は追加
+  // 既存DBへのカラム追加（ALTER TABLE）
   const cols = sqlite.prepare("PRAGMA table_info(tasks)").all() as { name: string }[]
-  const colNames = cols.map((c) => c.name)
+  const colNames = new Set(cols.map((c) => c.name))
 
-  if (!colNames.includes("project_id")) {
-    sqlite.exec("ALTER TABLE tasks ADD COLUMN project_id INTEGER REFERENCES projects(id)")
-    sqlite.exec("CREATE INDEX IF NOT EXISTS idx_tasks_project_id ON tasks(project_id)")
+  const additions: [string, string][] = [
+    ["project_id",   "INTEGER REFERENCES projects(id)"],
+    ["waiting_for",  "TEXT"],
+    ["scheduled_at", "INTEGER"],
+    ["today_start",  "INTEGER"],
+    ["duration_min", "INTEGER NOT NULL DEFAULT 30"],
+    ["context",      "TEXT NOT NULL DEFAULT ''"],
+    ["tags",         "TEXT NOT NULL DEFAULT ''"],
+    ["energy",       "TEXT CHECK(energy IN ('low','mid','high'))"],
+  ]
+  for (const [col, def] of additions) {
+    if (!colNames.has(col)) {
+      sqlite.exec(`ALTER TABLE tasks ADD COLUMN ${col} ${def}`)
+    }
   }
-  if (!colNames.includes("waiting_for")) {
-    sqlite.exec("ALTER TABLE tasks ADD COLUMN waiting_for TEXT")
-  }
-  // status の CHECK 制約は SQLite では ALTER で変更不可のため、
-  // 既存レコードの新ステータス値は INSERT/UPDATE 側で制御する
 
   sqlite.close()
 }
