@@ -153,9 +153,13 @@ export default function TodayPage() {
         </div>
 
         {/* Next Actions（未スケジュール） */}
-        <div className="w-56">
+        <div
+          className="w-56"
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={(e) => { e.preventDefault(); if (dragging) unassign(dragging) }}
+        >
           <p className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-2">Next Actions</p>
-          <p className="text-xs text-gray-400 mb-3">ドラッグしてカレンダーに配置</p>
+          <p className="text-xs text-gray-400 mb-3">ドラッグして配置・ここに戻して解除</p>
           <ul className="space-y-2">
             {nextTasks
               .filter((t) => t.todayStart == null)
