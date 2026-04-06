@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
 import { Geist } from "next/font/google"
 import Link from "next/link"
+import { GlobalCapture } from "@/components/GlobalCapture"
 import "./globals.css"
 
 const geist = Geist({ subsets: ["latin"] })
@@ -27,7 +28,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="ja">
       <body className={`${geist.className} bg-gray-50 text-gray-900 flex min-h-screen`}>
-        <nav className="w-48 shrink-0 bg-white border-r flex flex-col py-4">
+        <nav className="w-48 shrink-0 bg-white border-r flex flex-col py-4 sticky top-0 h-screen">
           <Link href="/" className="px-4 py-2 text-base font-bold text-blue-600 hover:text-blue-700 mb-2">
             GTD
           </Link>
@@ -40,6 +41,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               {label}
             </Link>
           ))}
+          <GlobalCapture />
         </nav>
         <main className="flex-1 px-8 py-8 max-w-2xl">{children}</main>
       </body>

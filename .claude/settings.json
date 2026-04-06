@@ -4,7 +4,11 @@
       "Bash(source ~/.bashrc)",
       "Bash(cp /home/hosoai/mono/tempgtd/CLAUDE.md /tmp/gtd-backup/)",
       "Bash(cp /home/hosoai/mono/tempgtd/Chat.log /tmp/gtd-backup/)",
-      "Bash(curl -sv http://localhost:3000/api/tasks?status=inbox)"
+      "Bash(curl -sv http://localhost:3000/api/tasks?status=inbox)",
+      "Bash(export FNM_PATH=/home/hosoai/.local/share/fnm)",
+      "Bash(export PATH=$FNM_PATH:$PATH)",
+      "Bash(eval '$\\(fnm env --shell bash\\)')",
+      "Bash(sqlite3 /home/hosoai/mono/tempgtd/gtd.db \"PRAGMA table_info\\(tasks\\);\")"
     ],
     "additionalDirectories": [
       "/tmp/gtd-backup",

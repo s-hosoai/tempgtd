@@ -9,6 +9,7 @@ const CreateTaskSchema = z.object({
   notes: z.string().optional(),
   parentId: z.number().optional(),
   projectId: z.number().optional(),
+  targetStatus: z.enum(["inbox", "next", "delegate", "waiting", "someday"]).optional(),
 })
 
 export async function GET(request: NextRequest) {
@@ -51,7 +52,7 @@ export async function POST(request: NextRequest) {
       notes: parsed.data.notes ?? "",
       parentId: parsed.data.parentId ?? null,
       projectId: parsed.data.projectId ?? null,
-      status: "inbox",
+      status: parsed.data.targetStatus ?? "inbox",
       createdAt: now,
       updatedAt: now,
     })

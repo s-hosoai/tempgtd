@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
+import { useCapture } from "@/lib/useCapture"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import type { Task } from "@/lib/db/schema"
@@ -24,13 +25,14 @@ export default function NextActionsPage() {
   const [energyFilter, setEnergyFilter] = useState("")
   const [contextFilter, setContextFilter] = useState("")
 
-  async function loadTasks() {
+  const loadTasks = useCallback(async () => {
     const res = await fetch("/api/tasks?status=next")
     setTasks(await res.json())
     setLoading(false)
-  }
+  }, [])
 
-  useEffect(() => { loadTasks() }, [])
+  useEffect(() => { loadTasks() }, [loadTasks])
+  useCapture("next", loadTasks)
 
   async function handleDone(id: number) {
     await fetch(`/api/tasks/${id}`, {

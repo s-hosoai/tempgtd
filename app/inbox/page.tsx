@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
+import { useCapture } from "@/lib/useCapture"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -12,13 +13,14 @@ export default function InboxPage() {
   const [title, setTitle] = useState("")
   const [loading, setLoading] = useState(true)
 
-  async function loadTasks() {
+  const loadTasks = useCallback(async () => {
     const res = await fetch("/api/tasks?status=inbox")
     setTasks(await res.json())
     setLoading(false)
-  }
+  }, [])
 
-  useEffect(() => { loadTasks() }, [])
+  useEffect(() => { loadTasks() }, [loadTasks])
+  useCapture("inbox", loadTasks)
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault()

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { useCapture } from "@/lib/useCapture"
 import type { Task, TaskStatus } from "@/lib/db/schema"
 
 type Props = {
@@ -29,6 +30,7 @@ export function TaskList({ status, emptyText, doneStatus = "done" }: Props) {
   }, [status])
 
   useEffect(() => { load() }, [load])
+  useCapture(status, load)
 
   async function moveTo(id: number, nextStatus: TaskStatus) {
     await fetch(`/api/tasks/${id}`, {
