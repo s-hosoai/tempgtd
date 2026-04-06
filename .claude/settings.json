@@ -3,7 +3,8 @@
     "allow": [
       "Bash(source ~/.bashrc)",
       "Bash(cp /home/hosoai/mono/tempgtd/CLAUDE.md /tmp/gtd-backup/)",
-      "Bash(cp /home/hosoai/mono/tempgtd/Chat.log /tmp/gtd-backup/)"
+      "Bash(cp /home/hosoai/mono/tempgtd/Chat.log /tmp/gtd-backup/)",
+      "Bash(curl -sv http://localhost:3000/api/tasks?status=inbox)"
     ],
     "additionalDirectories": [
       "/tmp/gtd-backup",
