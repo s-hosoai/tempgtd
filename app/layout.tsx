@@ -17,10 +17,8 @@ const NAV_ITEMS = [
   { href: "/next-actions", label: "Next Actions" },
   { href: "/today",        label: "Today" },
   { href: "/projects",     label: "Projects" },
-  { href: "/delegate",     label: "Delegate" },
-  { href: "/waiting",      label: "Waiting" },
-  { href: "/someday",      label: "Someday" },
-  { href: "/done",         label: "Done" },
+  { href: "/tasks",        label: "Tasks" },
+  { href: "/templates",    label: "Templates" },
   { href: "/review",       label: "Review" },
 ]
 

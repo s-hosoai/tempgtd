@@ -48,6 +48,44 @@ export function runMigrations() {
     CREATE INDEX IF NOT EXISTS idx_tasks_today_start ON tasks(today_start);
   `)
 
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS templates (
+      id             INTEGER PRIMARY KEY,
+      title          TEXT NOT NULL,
+      trigger        TEXT NOT NULL DEFAULT 'manual'
+                     CHECK(trigger IN ('manual','scheduled')),
+      cron           TEXT,
+      target_status  TEXT NOT NULL DEFAULT 'inbox'
+                     CHECK(target_status IN ('inbox','next')),
+      last_run_at    INTEGER,
+      notes          TEXT NOT NULL DEFAULT '',
+      created_at     INTEGER NOT NULL,
+      updated_at     INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS template_tasks (
+      id               INTEGER PRIMARY KEY,
+      template_id      INTEGER NOT NULL REFERENCES templates(id) ON DELETE CASCADE,
+      parent_id        INTEGER REFERENCES template_tasks(id) ON DELETE CASCADE,
+      title            TEXT NOT NULL,
+      "order"          INTEGER NOT NULL DEFAULT 0,
+      context          TEXT NOT NULL DEFAULT '',
+      tags             TEXT NOT NULL DEFAULT '',
+      duration_min     INTEGER NOT NULL DEFAULT 30,
+      energy           TEXT CHECK(energy IN ('low','mid','high')),
+      notes            TEXT NOT NULL DEFAULT '',
+      offset_type      TEXT NOT NULL DEFAULT 'none'
+                       CHECK(offset_type IN ('none','cron','relative')),
+      offset_cron      TEXT,
+      offset_relative  TEXT,
+      created_at       INTEGER NOT NULL,
+      updated_at       INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_template_tasks_template_id ON template_tasks(template_id);
+    CREATE INDEX IF NOT EXISTS idx_template_tasks_parent_id   ON template_tasks(parent_id);
+    CREATE INDEX IF NOT EXISTS idx_templates_trigger          ON templates(trigger);
+  `)
+
   // 既存DBへのカラム追加（ALTER TABLE）
   const cols = sqlite.prepare("PRAGMA table_info(tasks)").all() as { name: string }[]
   const colNames = new Set(cols.map((c) => c.name))

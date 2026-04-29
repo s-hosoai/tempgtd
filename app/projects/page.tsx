@@ -55,6 +55,12 @@ export default function ProjectsPage() {
     load()
   }
 
+  async function handleToTemplate(id: number) {
+    const res = await fetch(`/api/projects/${id}/to-template`, { method: "POST" })
+    if (res.ok) alert("テンプレートを作成しました")
+    else alert("変換に失敗しました")
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -95,6 +101,12 @@ export default function ProjectsPage() {
                 {!p.hasNextAction && (
                   <Badge variant="destructive" className="text-xs">Next Actionなし</Badge>
                 )}
+                <button
+                  onClick={() => handleToTemplate(p.id)}
+                  className="text-xs text-gray-400 hover:text-blue-600"
+                >
+                  テンプレート化
+                </button>
                 <button
                   onClick={() => handleDone(p.id)}
                   className="text-xs text-gray-400 hover:text-green-600"

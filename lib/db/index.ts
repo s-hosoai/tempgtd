@@ -19,9 +19,12 @@ export function getDb() {
 
   _db = drizzle(sqlite, { schema })
 
-  // scheduled タスクの昇格チェック（初回接続時のみ）
+  // scheduled タスク昇格 & scheduled テンプレート展開（初回接続時のみ）
   import("@/lib/scheduler").then(({ promoteScheduledTasks }) => {
     promoteScheduledTasks()
+  })
+  import("@/lib/templateExpand").then(({ promoteScheduledTemplates }) => {
+    promoteScheduledTemplates()
   })
 
   return _db
