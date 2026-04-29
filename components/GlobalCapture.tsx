@@ -7,13 +7,8 @@ import type { TaskStatus } from "@/lib/db/schema"
 
 // パスに対応する「直接追加先」ステータス。null のページはトグル非表示
 const PATH_STATUS: Record<string, TaskStatus> = {
-  "/inbox":         "inbox",
-  "/inbox/triage":  "inbox",
-  "/next-actions":  "next",
-  "/delegate":      "delegate",
-  "/waiting":       "waiting",
-  "/someday":       "someday",
-  "/today":         "next",
+  "/inbox":  "inbox",
+  "/today":  "next",
 }
 
 const STATUS_LABEL: Partial<Record<TaskStatus, string>> = {
@@ -57,14 +52,14 @@ export function GlobalCapture() {
   return (
     <form
       onSubmit={handleSubmit}
-      className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-md px-4 py-3 flex items-center gap-3 z-50"
+      className="fixed bottom-0 left-0 right-0 bg-white border-t-2 border-gray-200 shadow-lg px-6 py-4 flex items-center gap-4 z-50"
     >
       <input
         ref={inputRef}
         value={title}
         onChange={(e) => setTitle(e.target.value)}
-        placeholder="Capture... (Enter で追加)"
-        className="flex-1 text-sm px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+        placeholder="Capture...　　Enter で追加"
+        className="flex-1 text-base px-4 py-3 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 bg-gray-50 placeholder:text-gray-400"
         disabled={busy}
       />
       {pageStatus && pageStatus !== "inbox" && (
@@ -83,6 +78,13 @@ export function GlobalCapture() {
           </label>
         </div>
       )}
+      <button
+        type="submit"
+        disabled={busy || !title.trim()}
+        className="shrink-0 px-5 py-3 bg-blue-600 text-white text-sm font-medium rounded-xl hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+      >
+        追加
+      </button>
     </form>
   )
 }

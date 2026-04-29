@@ -13,8 +13,6 @@ export const metadata: Metadata = {
 
 const NAV_ITEMS = [
   { href: "/inbox",        label: "Inbox" },
-  { href: "/inbox/triage", label: "Triage" },
-  { href: "/next-actions", label: "Next Actions" },
   { href: "/today",        label: "Today" },
   { href: "/projects",     label: "Projects" },
   { href: "/tasks",        label: "Tasks" },
@@ -41,7 +39,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               </Link>
             ))}
           </nav>
-          <main className="flex-1 px-8 py-8 max-w-2xl overflow-y-auto pb-20">{children}</main>
+          <main className="flex-1 px-8 py-8 overflow-y-auto pb-20">{children}</main>
         </div>
         <GlobalCapture />
       </body>
