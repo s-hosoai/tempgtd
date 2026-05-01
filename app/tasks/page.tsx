@@ -13,8 +13,8 @@ const STATUS_LABEL: Record<TaskStatus, string> = {
   waiting: "Waiting",
   scheduled: "Scheduled",
   someday: "Someday",
-  done: "完了",
-  cancelled: "キャンセル",
+  done: "Done",
+  cancelled: "Cancel",
 }
 
 const STATUS_COLOR: Record<TaskStatus, string> = {
@@ -81,6 +81,11 @@ export default function TasksPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status }),
     })
+    load()
+  }
+
+  async function deleteTask(id: number) {
+    await fetch(`/api/tasks/${id}`, { method: "DELETE" })
     load()
   }
 
@@ -173,9 +178,18 @@ export default function TasksPage() {
                     <button
                       onClick={() => moveTo(task.id, "done")}
                       className="w-6 h-6 mt-0.5 rounded-full border-2 border-gray-300 hover:border-green-500 hover:bg-green-50 flex items-center justify-center text-xs text-transparent hover:text-green-500 transition-colors"
-                      aria-label="完了"
+                      aria-label="Done"
                     >
                       ✓
+                    </button>
+                  )}
+                  {(task.status === "done" || task.status === "cancelled") && (
+                    <button
+                      onClick={() => deleteTask(task.id)}
+                      className="w-6 h-6 mt-0.5 rounded border border-gray-200 hover:border-red-400 hover:bg-red-50 flex items-center justify-center text-gray-300 hover:text-red-500 text-xs transition-colors"
+                      aria-label="削除"
+                    >
+                      ×
                     </button>
                   )}
                 </div>

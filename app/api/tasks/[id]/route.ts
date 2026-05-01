@@ -68,10 +68,8 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
-  await db
-    .update(tasks)
-    .set({ status: "cancelled", updatedAt: Date.now() })
-    .where(eq(tasks.id, parseInt(id)))
+  const taskId = parseInt(id)
+  await db.delete(tasks).where(eq(tasks.id, taskId))
 
   return new NextResponse(null, { status: 204 })
 }
