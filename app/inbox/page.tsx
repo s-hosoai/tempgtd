@@ -32,6 +32,7 @@ export default function InboxPage() {
         setNotes(next?.notes ?? "")
         setWaitingFor("")
         setScheduledDate("")
+        setSelectedProjectId(next?.projectId ?? null)
       }
       return next
     })
@@ -67,7 +68,7 @@ export default function InboxPage() {
     setNotes(task.notes ?? "")
     setWaitingFor("")
     setScheduledDate("")
-    setSelectedProjectId(null)
+    setSelectedProjectId(task.projectId ?? null)
   }
 
   async function handleAction(
