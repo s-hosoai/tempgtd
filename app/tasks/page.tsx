@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
-import type { Task, TaskStatus } from "@/lib/db/schema"
+import type { Task, TaskStatus, Project } from "@/lib/db/schema"
 
 const ALL_STATUSES: TaskStatus[] = ["inbox", "next", "delegate", "waiting", "scheduled", "someday", "done", "cancelled"]
 
@@ -48,10 +48,16 @@ export default function TasksPage() {
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
   const [activeStatuses, setActiveStatuses] = useState<Set<TaskStatus>>(new Set(ALL_STATUSES))
+  const [projectMap, setProjectMap] = useState<Map<number, string>>(new Map())
 
   const load = useCallback(async () => {
-    const res = await fetch("/api/tasks")
-    setTasks(await res.json())
+    const [taskRes, projRes] = await Promise.all([
+      fetch("/api/tasks"),
+      fetch("/api/projects?status=active"),
+    ])
+    setTasks(await taskRes.json())
+    const projs: Project[] = await projRes.json()
+    setProjectMap(new Map(projs.map((p) => [p.id, p.title])))
     setLoading(false)
   }, [])
 
@@ -121,7 +127,15 @@ export default function TasksPage() {
                     <span className={`text-xs px-1.5 py-0.5 rounded font-medium shrink-0 ${STATUS_COLOR[task.status]}`}>
                       {STATUS_LABEL[task.status]}
                     </span>
-                    <span className={`text-sm ${task.status === "done" ? "line-through text-gray-400" : task.status === "cancelled" ? "line-through text-gray-400" : "text-gray-800"}`}>
+                    {task.projectId && projectMap.has(task.projectId) && (
+                      <span
+                        className="text-xs px-1.5 py-0.5 rounded font-medium shrink-0 bg-indigo-100 text-indigo-700"
+                        title={projectMap.get(task.projectId)}
+                      >
+                        {projectMap.get(task.projectId)!.slice(0, 5)}
+                      </span>
+                    )}
+                    <span className={`text-sm ${task.status === "done" || task.status === "cancelled" ? "line-through text-gray-400" : "text-gray-800"}`}>
                       {task.title}
                     </span>
                   </div>
