@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import type { Task } from "@/lib/db/schema"
+import type { Task, Project } from "@/lib/db/schema"
 
 export default function InboxPage() {
   const [tasks, setTasks] = useState<Task[]>([])
@@ -18,6 +18,8 @@ export default function InboxPage() {
   const [captureTitle, setCaptureTitle] = useState("")
   const [busy, setBusy] = useState(false)
   const captureRef = useRef<HTMLInputElement>(null)
+  const [projects, setProjects] = useState<Project[]>([])
+  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null)
 
   const loadTasks = useCallback(async () => {
     const res = await fetch("/api/tasks?status=inbox")
@@ -39,6 +41,12 @@ export default function InboxPage() {
   useEffect(() => { loadTasks() }, [loadTasks])
   useCapture("inbox", loadTasks)
 
+  useEffect(() => {
+    fetch("/api/projects?status=active")
+      .then((r) => r.json())
+      .then(setProjects)
+  }, [])
+
   async function handleCapture(e: React.FormEvent) {
     e.preventDefault()
     if (!captureTitle.trim() || busy) return
@@ -59,6 +67,7 @@ export default function InboxPage() {
     setNotes(task.notes ?? "")
     setWaitingFor("")
     setScheduledDate("")
+    setSelectedProjectId(null)
   }
 
   async function handleAction(
@@ -66,7 +75,7 @@ export default function InboxPage() {
     twoMinute = false
   ) {
     if (!selected) return
-    const body: Record<string, unknown> = { status, notes, twoMinute }
+    const body: Record<string, unknown> = { status, notes, twoMinute, projectId: selectedProjectId }
     if (status === "waiting" || status === "delegate") body.waitingFor = waitingFor || null
     if (status === "scheduled" && scheduledDate) body.scheduledAt = new Date(scheduledDate).getTime()
     await fetch(`/api/tasks/${selected.id}`, {
@@ -135,6 +144,19 @@ export default function InboxPage() {
                     placeholder="メモ（任意）"
                     rows={3}
                   />
+                  <div className="mt-3">
+                    <label className="text-xs text-gray-500 mb-1 block">プロジェクト</label>
+                    <select
+                      value={selectedProjectId ?? ""}
+                      onChange={(e) => setSelectedProjectId(e.target.value ? Number(e.target.value) : null)}
+                      className="w-full text-sm px-3 py-2 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    >
+                      <option value="">所属なし</option>
+                      {projects.map((p) => (
+                        <option key={p.id} value={p.id}>{p.title}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
 
                 {/* 振り分けボタン群 */}
