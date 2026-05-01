@@ -70,16 +70,16 @@ export function GlobalCapture() {
     }
   }
 
-  async function handleChange() {
+  async function applyStatus(status: TaskStatus) {
     if (!currentTask || changing) return
     setChanging(true)
     try {
       await fetch(`/api/tasks/${currentTask.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: changeStatus }),
+        body: JSON.stringify({ status }),
       })
-      window.dispatchEvent(new CustomEvent("gtd:captured", { detail: { status: changeStatus } }))
+      window.dispatchEvent(new CustomEvent("gtd:captured", { detail: { status } }))
       await loadCurrentTask()
     } finally {
       setChanging(false)
@@ -93,6 +93,12 @@ export function GlobalCapture() {
         <span className="text-xs font-medium text-gray-400 shrink-0">Current</span>
         {currentTask ? (
           <>
+            <button
+              onClick={() => applyStatus("done")}
+              disabled={changing}
+              className="w-4 h-4 rounded border-2 border-gray-400 hover:border-green-500 hover:bg-green-50 shrink-0 flex items-center justify-center text-transparent hover:text-green-500 text-xs transition-colors"
+              aria-label="Done"
+            >✓</button>
             <span className="flex-1 text-sm font-medium text-gray-800 truncate" title={currentTask.title}>
               {currentTask.title}
             </span>
@@ -106,7 +112,7 @@ export function GlobalCapture() {
               ))}
             </select>
             <button
-              onClick={handleChange}
+              onClick={() => applyStatus(changeStatus)}
               disabled={changing}
               className="shrink-0 px-3 py-1 bg-gray-700 text-white text-xs font-medium rounded-lg hover:bg-gray-900 disabled:opacity-40 transition-colors"
             >
