@@ -63,6 +63,11 @@ export default function TasksPage() {
 
   useEffect(() => { load() }, [load])
 
+  useEffect(() => {
+    window.addEventListener("gtd:captured", load)
+    return () => window.removeEventListener("gtd:captured", load)
+  }, [load])
+
   function toggleStatus(s: TaskStatus) {
     setActiveStatuses((prev) => {
       const next = new Set(prev)

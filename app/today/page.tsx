@@ -101,6 +101,7 @@ function NextActionsTab() {
         })
       )
     )
+    window.dispatchEvent(new CustomEvent("gtd:captured", { detail: { status: "next" } }))
   }
 
   const allContexts = Array.from(
