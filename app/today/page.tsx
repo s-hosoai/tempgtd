@@ -1,9 +1,10 @@
 "use client"
 
-import { useState, useEffect, useCallback, Suspense } from "react"
+import { useState, useEffect, useCallback, Suspense, useRef } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { GripVertical } from "lucide-react"
 import { useCapture } from "@/lib/useCapture"
 import type { Task } from "@/lib/db/schema"
 
@@ -53,6 +54,8 @@ function NextActionsTab() {
   const [loading, setLoading] = useState(true)
   const [energyFilter, setEnergyFilter] = useState("")
   const [contextFilter, setContextFilter] = useState("")
+  const dragIndex = useRef<number | null>(null)
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
 
   const loadTasks = useCallback(async () => {
     const res = await fetch("/api/tasks?status=next")
@@ -70,6 +73,35 @@ function NextActionsTab() {
       body: JSON.stringify({ status: "done" }),
     })
     loadTasks()
+  }
+
+  async function handleDrop(dropFilteredIndex: number) {
+    const from = dragIndex.current
+    if (from === null || from === dropFilteredIndex) {
+      dragIndex.current = null
+      setDragOverIndex(null)
+      return
+    }
+    // filtered → tasks インデックスへ変換してreorder
+    const draggedTask = filtered[from]
+    const targetTask  = filtered[dropFilteredIndex]
+    const newTasks = tasks.filter((t) => t.id !== draggedTask.id)
+    const insertAt = newTasks.findIndex((t) => t.id === targetTask.id)
+    newTasks.splice(insertAt, 0, draggedTask)
+    const updated = newTasks.map((t, i) => ({ ...t, nextOrder: i }))
+    setTasks(updated)
+    dragIndex.current = null
+    setDragOverIndex(null)
+    await Promise.all(
+      updated.map((t, i) =>
+        fetch(`/api/tasks/${t.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ nextOrder: i }),
+        })
+      )
+    )
+    window.dispatchEvent(new CustomEvent("gtd:captured", { detail: { status: "next" } }))
   }
 
   const allContexts = Array.from(
@@ -135,7 +167,24 @@ function NextActionsTab() {
       ) : (
         <ul className="space-y-2">
           {filtered.map((task, i) => (
-            <li key={task.id} className="flex items-start gap-3 bg-white rounded-lg border px-4 py-3">
+            <li
+              key={task.id}
+              draggable
+              onDragStart={() => { dragIndex.current = i }}
+              onDragOver={(e) => { e.preventDefault(); setDragOverIndex(i) }}
+              onDragLeave={() => setDragOverIndex(null)}
+              onDrop={() => handleDrop(i)}
+              onDragEnd={() => { dragIndex.current = null; setDragOverIndex(null) }}
+              className={`flex items-start gap-3 bg-white rounded-lg border px-4 py-3 transition-colors ${
+                dragOverIndex === i ? "border-blue-400 bg-blue-50" : ""
+              }`}
+            >
+              <div
+                className="mt-0.5 text-gray-300 hover:text-gray-500 cursor-grab active:cursor-grabbing flex-shrink-0"
+                title="ドラッグで並び替え"
+              >
+                <GripVertical size={16} />
+              </div>
               <button
                 onClick={() => handleDone(task.id)}
                 className="w-5 h-5 mt-0.5 rounded-full border-2 border-gray-300 hover:border-green-500 flex-shrink-0"

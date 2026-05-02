@@ -27,7 +27,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <div className="flex flex-1 overflow-hidden">
           <nav className="w-48 shrink-0 bg-white border-r flex flex-col py-4 sticky top-0 h-screen">
             <Link href="/" className="px-4 py-2 text-base font-bold text-blue-600 hover:text-blue-700 mb-2">
-              GTD
+              TempGTD
             </Link>
             {NAV_ITEMS.map(({ href, label }) => (
               <Link
