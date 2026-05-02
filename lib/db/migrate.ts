@@ -1,7 +1,7 @@
 import Database from "better-sqlite3"
 import path from "path"
 
-const DB_PATH = path.join(process.cwd(), "gtd.db")
+const DB_PATH = process.env.DB_PATH ?? path.join(process.cwd(), "gtd.db")
 
 export function runMigrations() {
   const sqlite = new Database(DB_PATH)

@@ -4,7 +4,7 @@ import path from "path"
 import { runMigrations } from "./migrate"
 import * as schema from "./schema"
 
-const DB_PATH = path.join(process.cwd(), "gtd.db")
+const DB_PATH = process.env.DB_PATH ?? path.join(process.cwd(), "gtd.db")
 
 let _db: ReturnType<typeof drizzle> | null = null
 
