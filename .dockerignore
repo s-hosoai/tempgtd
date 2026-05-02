@@ -1,0 +1,9 @@
+.git
+.gitignore
+node_modules
+.next
+*.db
+*.db-shm
+*.db-wal
+README.md
+.env*
