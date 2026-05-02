@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -30,21 +30,24 @@ export default function TemplatesPage() {
   const [newTaskOffsetType, setNewTaskOffsetType] = useState<"none" | "relative">("none")
   const [newTaskOffsetRelative, setNewTaskOffsetRelative] = useState("")
 
-  async function loadTemplates() {
-    const res = await fetch("/api/templates")
-    const rows: Template[] = await res.json()
-    const withTasks = await Promise.all(
-      rows.map(async (t) => {
-        const tRes = await fetch(`/api/templates/${t.id}/tasks`)
-        const tasks: TemplateTask[] = await tRes.json()
-        return { ...t, tasks }
-      })
-    )
-    setTemplates(withTasks)
-    setLoading(false)
-  }
+  const loadTemplates = useCallback(async () => {
+    try {
+      const res = await fetch("/api/templates")
+      const rows: Template[] = await res.json()
+      const withTasks = await Promise.all(
+        rows.map(async (t) => {
+          const tRes = await fetch(`/api/templates/${t.id}/tasks`)
+          const tasks: TemplateTask[] = await tRes.json()
+          return { ...t, tasks }
+        })
+      )
+      setTemplates(withTasks)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
 
-  useEffect(() => { loadTemplates() }, [])
+  useEffect(() => { loadTemplates() }, [loadTemplates])
 
   async function handleCreate() {
     if (!newTitle.trim()) return
