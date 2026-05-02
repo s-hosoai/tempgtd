@@ -1,28 +1,33 @@
-# fly.toml — アプリ名は `fly launch` 実行時に設定されます
-# app = "your-gtd-app"   ← fly launch 後に自動で設定される
-primary_region = "nrt"   # 東京リージョン
+# fly.toml app configuration file generated for tempgtd on 2026-05-02T16:26:53+09:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'tempgtd'
+primary_region = 'nrt'
 
 [build]
-  dockerfile = "Dockerfile"
+  dockerfile = 'Dockerfile'
 
 [env]
-  NODE_ENV   = "production"
-  PORT       = "3000"
-  DB_PATH    = "/data/gtd.db"
+  DB_PATH = '/data/gtd.db'
+  NODE_ENV = 'production'
+  PORT = '3000'
+
+[[mounts]]
+  source = 'gtd_data'
+  destination = '/data'
+  initial_size = '1gb'
 
 [http_service]
-  internal_port        = 3000
-  force_https          = true
-  auto_stop_machines   = "stop"   # アクセスがないとき自動停止（コスト節約）
-  auto_start_machines  = true     # リクエスト時に自動起動
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
   min_machines_running = 0
 
 [[vm]]
-  memory   = "512mb"
-  cpu_kind = "shared"
-  cpus     = 1
-
-[[mounts]]
-  source      = "gtd_data"   # `fly volumes create` で作成するボリューム名
-  destination = "/data"
-  initial_size = "1gb"
+  memory = '512mb'
+  cpu_kind = 'shared'
+  cpus = 1
+  memory_mb = 512
