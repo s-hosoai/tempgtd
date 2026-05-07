@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // better-sqlite3 はネイティブバイナリを持つため、Next.js のバンドル対象から除外する
+  serverExternalPackages: ["better-sqlite3"],
 };
 
 export default nextConfig;
