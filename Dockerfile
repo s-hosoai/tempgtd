@@ -12,6 +12,9 @@ WORKDIR /app
 COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
 
+# better-sqlite3 のネイティブバイナリを明示的に再コンパイル
+RUN pnpm rebuild better-sqlite3
+
 # ソースをコピーしてビルド
 COPY . .
 RUN pnpm build
