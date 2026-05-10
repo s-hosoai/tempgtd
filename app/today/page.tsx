@@ -10,7 +10,7 @@ import type { Task } from "@/lib/db/schema"
 
 // ── カレンダー定数 ──────────────────────────────
 const START_HOUR = 7
-const END_HOUR = 22
+const END_HOUR = 24
 const SLOT_MIN = 30
 const SLOTS = ((END_HOUR - START_HOUR) * 60) / SLOT_MIN
 
@@ -270,7 +270,7 @@ function TodayCalendarTab() {
     <div className="flex gap-6">
       {/* カレンダー */}
       <div className="flex-1">
-        <div className="bg-white border rounded-lg overflow-hidden">
+        <div className="bg-white border rounded-lg overflow-y-auto max-h-[calc(100vh-180px)]">
           {Array.from({ length: SLOTS }, (_, i) => {
             const task = taskAtSlot(i)
             const isStart = task != null && msToSlot(task.todayStart!) === i
@@ -311,13 +311,13 @@ function TodayCalendarTab() {
 
       {/* Next Actions（未スケジュール） */}
       <div
-        className="w-56"
+        className="w-56 flex flex-col max-h-[calc(100vh-180px)]"
         onDragOver={(e) => e.preventDefault()}
         onDrop={(e) => { e.preventDefault(); if (dragging) unassign(dragging) }}
       >
         <p className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-2">Next Actions</p>
         <p className="text-xs text-gray-400 mb-3">ドラッグして配置・ここに戻して解除</p>
-        <ul className="space-y-2">
+        <ul className="space-y-2 overflow-y-auto flex-1">
           {nextTasks.filter((t) => t.todayStart == null).map((task) => (
             <li
               key={task.id}
