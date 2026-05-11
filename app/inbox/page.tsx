@@ -87,6 +87,19 @@ export default function InboxPage() {
     await loadTasks()
   }
 
+  async function handleSkip() {
+    if (!selected) return
+    const tomorrow = new Date()
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    tomorrow.setHours(0, 0, 0, 0)
+    await fetch(`/api/tasks/${selected.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ deferredUntil: tomorrow.getTime() }),
+    })
+    await loadTasks()
+  }
+
   return (
     <div className="flex flex-col gap-4 h-full max-w-5xl">
       {/* ── 上部: キャプチャ入力 + 対象タスク ── */}
@@ -226,6 +239,15 @@ export default function InboxPage() {
                       不要 / キャンセル
                     </Button>
                   </div>
+
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    className="w-full text-base text-gray-400 hover:text-gray-600 border-dashed"
+                    onClick={handleSkip}
+                  >
+                    翌日へ先送り（Skip）
+                  </Button>
                 </div>
               </>
             )}

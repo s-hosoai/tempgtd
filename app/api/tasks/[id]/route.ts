@@ -11,6 +11,7 @@ const UpdateTaskSchema = z.object({
   projectId: z.number().nullable().optional(),
   waitingFor: z.string().nullable().optional(),
   scheduledAt: z.number().nullable().optional(),
+  deferredUntil: z.number().nullable().optional(),
   todayStart: z.number().nullable().optional(),
   durationMin: z.number().optional(),
   context: z.string().optional(),  // JSON配列文字列
