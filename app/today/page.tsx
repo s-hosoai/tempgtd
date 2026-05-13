@@ -10,7 +10,7 @@ import type { Task } from "@/lib/db/schema"
 
 // ── カレンダー定数 ──────────────────────────────
 const START_HOUR = 7
-const END_HOUR = 22
+const END_HOUR = 24
 const SLOT_MIN = 30
 const SLOTS = ((END_HOUR - START_HOUR) * 60) / SLOT_MIN
 
@@ -293,7 +293,7 @@ function TodayCalendarTab() {
         <p className="md:hidden text-xs text-gray-400 mb-2">タップして選択 → スロットをタップして配置</p>
 
         {/* mobile: 横スクロール strip */}
-        <div className="flex md:flex-col gap-2 overflow-x-auto md:overflow-x-visible pb-1 md:pb-0">
+        <div className="flex md:flex-col gap-2 overflow-x-auto md:overflow-x-visible md:overflow-y-auto md:max-h-[calc(100vh-180px)] pb-1 md:pb-0">
           {unscheduled.length === 0 ? (
             <p className="text-xs text-gray-400 shrink-0">すべて配置済み</p>
           ) : (
@@ -346,7 +346,7 @@ function TodayCalendarTab() {
           </div>
         )}
 
-        <div className="bg-white border rounded-lg overflow-hidden">
+        <div className="bg-white border rounded-lg overflow-y-auto md:max-h-[calc(100vh-180px)]">
           {Array.from({ length: SLOTS }, (_, i) => {
             const task = taskAtSlot(i)
             const isStart = task != null && msToSlot(task.todayStart!) === i

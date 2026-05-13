@@ -27,6 +27,7 @@ export const tasks = sqliteTable("tasks", {
   nextOrder: real("next_order"),       // status=next のときのソート順
   waitingFor: text("waiting_for"),     // 誰/何を待っているか
   scheduledAt: integer("scheduled_at"), // status=scheduled: この時刻にnextへ昇格(UnixTime ms)
+  deferredUntil: integer("deferred_until"), // この時刻までinboxに表示しない(UnixTime ms)
   todayStart: integer("today_start"),  // 今日のスケジュール開始時刻(UnixTime ms)
   durationMin: integer("duration_min").notNull().default(30), // 見積もり時間（30分単位）
   context: text("context").notNull().default(""),  // JSON配列文字列 例: '["@pc","@home"]'

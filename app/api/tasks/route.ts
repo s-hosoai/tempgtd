@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { eq, asc, desc } from "drizzle-orm"
+import { and, eq, asc, desc, isNull, lte, or } from "drizzle-orm"
 import { z } from "zod"
 import { db } from "@/lib/db"
 import { tasks, type Task } from "@/lib/db/schema"
@@ -19,12 +19,15 @@ export async function GET(request: NextRequest) {
 
   let query = db.select().from(tasks).$dynamic()
 
-  if (status) {
-    query = query.where(eq(tasks.status, status as Task["status"]))
+  const conditions = []
+  if (status) conditions.push(eq(tasks.status, status as Task["status"]))
+  if (projectId) conditions.push(eq(tasks.projectId, parseInt(projectId)))
+  // inbox では先送り中（deferred_until > now）のタスクを除外
+  if (status === "inbox") {
+    const now = Date.now()
+    conditions.push(or(isNull(tasks.deferredUntil), lte(tasks.deferredUntil, now))!)
   }
-  if (projectId) {
-    query = query.where(eq(tasks.projectId, parseInt(projectId)))
-  }
+  if (conditions.length > 0) query = query.where(and(...conditions))
 
   const orderBy =
     status === "next"    ? asc(tasks.nextOrder) :

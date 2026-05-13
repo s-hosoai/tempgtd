@@ -91,14 +91,15 @@ export function runMigrations() {
   const colNames = new Set(cols.map((c) => c.name))
 
   const additions: [string, string][] = [
-    ["project_id",   "INTEGER REFERENCES projects(id)"],
-    ["waiting_for",  "TEXT"],
-    ["scheduled_at", "INTEGER"],
-    ["today_start",  "INTEGER"],
-    ["duration_min", "INTEGER NOT NULL DEFAULT 30"],
-    ["context",      "TEXT NOT NULL DEFAULT ''"],
-    ["tags",         "TEXT NOT NULL DEFAULT ''"],
-    ["energy",       "TEXT CHECK(energy IN ('low','mid','high'))"],
+    ["project_id",    "INTEGER REFERENCES projects(id)"],
+    ["waiting_for",   "TEXT"],
+    ["scheduled_at",  "INTEGER"],
+    ["deferred_until","INTEGER"],
+    ["today_start",   "INTEGER"],
+    ["duration_min",  "INTEGER NOT NULL DEFAULT 30"],
+    ["context",       "TEXT NOT NULL DEFAULT ''"],
+    ["tags",          "TEXT NOT NULL DEFAULT ''"],
+    ["energy",        "TEXT CHECK(energy IN ('low','mid','high'))"],
   ]
   for (const [col, def] of additions) {
     if (!colNames.has(col)) {
