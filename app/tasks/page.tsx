@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import type { Task, TaskStatus, Project } from "@/lib/db/schema"
@@ -60,51 +60,55 @@ function TaskDetailPanel({
   const [title, setTitle] = useState(task.title)
   const [status, setStatus] = useState<TaskStatus>(task.status)
   const [notes, setNotes] = useState(task.notes ?? "")
-  const [energy, setEnergy] = useState(task.energy ?? "")
   const [projectId, setProjectId] = useState<number | null>(task.projectId ?? null)
   const [waitingFor, setWaitingFor] = useState(task.waitingFor ?? "")
   const [durationMin, setDurationMin] = useState(task.durationMin)
-  const [saving, setSaving] = useState(false)
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle")
+  const skipSaveRef = useRef(true)
 
+  // タスク切り替え時にフィールドをリセット（次の変更検知をスキップ）
   useEffect(() => {
+    skipSaveRef.current = true
     setTitle(task.title)
     setStatus(task.status)
     setNotes(task.notes ?? "")
-    setEnergy(task.energy ?? "")
     setProjectId(task.projectId ?? null)
     setWaitingFor(task.waitingFor ?? "")
     setDurationMin(task.durationMin)
   }, [task.id])
 
-  async function handleSave() {
-    if (saving) return
-    setSaving(true)
-    await onSave(task.id, {
-      title,
-      status,
-      notes,
-      energy: energy || null,
-      projectId,
-      waitingFor: waitingFor || null,
-      durationMin,
-    })
-    setSaving(false)
-  }
+  // フィールド変更を検知して600msデバウンス後に自動保存
+  useEffect(() => {
+    if (skipSaveRef.current) {
+      skipSaveRef.current = false
+      return
+    }
+    setSaveState("saving")
+    const timer = setTimeout(async () => {
+      await onSave(task.id, {
+        title,
+        status,
+        notes,
+        projectId,
+        waitingFor: waitingFor || null,
+        durationMin,
+      })
+      setSaveState("saved")
+      setTimeout(() => setSaveState("idle"), 1500)
+    }, 600)
+    return () => clearTimeout(timer)
+  // task.id は skipSaveRef のリセット側で管理するため依存から除外
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [title, status, notes, projectId, waitingFor, durationMin])
 
   return (
     <>
-      {/* ヘッダー（保存・閉じるボタン） */}
+      {/* ヘッダー */}
       <div className="flex items-center justify-between px-4 py-3 border-b shrink-0">
         <span className="text-sm font-semibold text-gray-700">タスク詳細</span>
-        <div className="flex items-center gap-2 shrink-0">
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={saving}
-            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg disabled:opacity-40 transition-colors"
-          >
-            {saving ? "保存中..." : "保存"}
-          </button>
+        <div className="flex items-center gap-3 shrink-0">
+          {saveState === "saving" && <span className="text-xs text-gray-400">保存中...</span>}
+          {saveState === "saved"  && <span className="text-xs text-green-500">✓ 保存済み</span>}
           <button
             type="button"
             onClick={onClose}
@@ -152,21 +156,6 @@ function TaskDetailPanel({
             placeholder="メモを入力..."
             className="w-full text-sm px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none"
           />
-        </div>
-
-        {/* エネルギー */}
-        <div>
-          <label className="text-xs font-medium text-gray-500 mb-1 block">エネルギー</label>
-          <select
-            value={energy}
-            onChange={(e) => setEnergy(e.target.value)}
-            className="w-full text-sm px-3 py-2 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-400"
-          >
-            <option value="">未設定</option>
-            <option value="low">低</option>
-            <option value="mid">中</option>
-            <option value="high">高</option>
-          </select>
         </div>
 
         {/* プロジェクト */}
