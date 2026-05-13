@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import type { Task, TaskStatus, Project } from "@/lib/db/schema"
 
@@ -44,11 +45,190 @@ function formatDate(ms: number | null): string {
   return new Date(ms).toLocaleString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })
 }
 
+// ── タスク詳細パネル ──────────────────────────────
+function TaskDetailPanel({
+  task,
+  projects,
+  onClose,
+  onSave,
+}: {
+  task: Task
+  projects: Project[]
+  onClose: () => void
+  onSave: (id: number, fields: Record<string, unknown>) => Promise<void>
+}) {
+  const [title, setTitle] = useState(task.title)
+  const [status, setStatus] = useState<TaskStatus>(task.status)
+  const [notes, setNotes] = useState(task.notes ?? "")
+  const [energy, setEnergy] = useState(task.energy ?? "")
+  const [projectId, setProjectId] = useState<number | null>(task.projectId ?? null)
+  const [waitingFor, setWaitingFor] = useState(task.waitingFor ?? "")
+  const [durationMin, setDurationMin] = useState(task.durationMin)
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    setTitle(task.title)
+    setStatus(task.status)
+    setNotes(task.notes ?? "")
+    setEnergy(task.energy ?? "")
+    setProjectId(task.projectId ?? null)
+    setWaitingFor(task.waitingFor ?? "")
+    setDurationMin(task.durationMin)
+  }, [task.id])
+
+  async function handleSave() {
+    if (saving) return
+    setSaving(true)
+    await onSave(task.id, {
+      title,
+      status,
+      notes,
+      energy: energy || null,
+      projectId,
+      waitingFor: waitingFor || null,
+      durationMin,
+    })
+    setSaving(false)
+  }
+
+  return (
+    <>
+      {/* ヘッダー（保存・閉じるボタン） */}
+      <div className="flex items-center justify-between px-4 py-3 border-b shrink-0">
+        <span className="text-sm font-semibold text-gray-700">タスク詳細</span>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={saving}
+            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg disabled:opacity-40 transition-colors"
+          >
+            {saving ? "保存中..." : "保存"}
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400"
+            aria-label="閉じる"
+          >
+            <X size={16} />
+          </button>
+        </div>
+      </div>
+
+      {/* スクロール可能なコンテンツ */}
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 pb-36 md:pb-6">
+        {/* タイトル */}
+        <div>
+          <label className="text-xs font-medium text-gray-500 mb-1 block">タイトル</label>
+          <input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            className="w-full text-sm px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+          />
+        </div>
+
+        {/* ステータス */}
+        <div>
+          <label className="text-xs font-medium text-gray-500 mb-1 block">ステータス</label>
+          <select
+            value={status}
+            onChange={(e) => setStatus(e.target.value as TaskStatus)}
+            className="w-full text-sm px-3 py-2 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-400"
+          >
+            {ALL_STATUSES.map((s) => (
+              <option key={s} value={s}>{STATUS_LABEL[s]}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* メモ */}
+        <div>
+          <label className="text-xs font-medium text-gray-500 mb-1 block">メモ</label>
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            rows={5}
+            placeholder="メモを入力..."
+            className="w-full text-sm px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none"
+          />
+        </div>
+
+        {/* エネルギー */}
+        <div>
+          <label className="text-xs font-medium text-gray-500 mb-1 block">エネルギー</label>
+          <select
+            value={energy}
+            onChange={(e) => setEnergy(e.target.value)}
+            className="w-full text-sm px-3 py-2 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-400"
+          >
+            <option value="">未設定</option>
+            <option value="low">低</option>
+            <option value="mid">中</option>
+            <option value="high">高</option>
+          </select>
+        </div>
+
+        {/* プロジェクト */}
+        <div>
+          <label className="text-xs font-medium text-gray-500 mb-1 block">プロジェクト</label>
+          <select
+            value={projectId ?? ""}
+            onChange={(e) => setProjectId(e.target.value ? Number(e.target.value) : null)}
+            className="w-full text-sm px-3 py-2 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-400"
+          >
+            <option value="">所属なし</option>
+            {projects.map((p) => (
+              <option key={p.id} value={p.id}>{p.title}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* 待ち相手（waiting / delegate のみ） */}
+        {(status === "waiting" || status === "delegate") && (
+          <div>
+            <label className="text-xs font-medium text-gray-500 mb-1 block">誰を待っているか</label>
+            <input
+              value={waitingFor}
+              onChange={(e) => setWaitingFor(e.target.value)}
+              placeholder="名前・件名..."
+              className="w-full text-sm px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+            />
+          </div>
+        )}
+
+        {/* 見積もり時間 */}
+        <div>
+          <label className="text-xs font-medium text-gray-500 mb-1 block">見積もり時間</label>
+          <select
+            value={durationMin}
+            onChange={(e) => setDurationMin(Number(e.target.value))}
+            className="w-full text-sm px-3 py-2 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-400"
+          >
+            {[30, 60, 90, 120, 180, 240].map((m) => (
+              <option key={m} value={m}>{m}分</option>
+            ))}
+          </select>
+        </div>
+
+        {/* タイムスタンプ */}
+        <div className="text-xs text-gray-400 space-y-0.5 pt-2 border-t">
+          <p>作成: {new Date(task.createdAt).toLocaleString("ja-JP")}</p>
+          <p>更新: {new Date(task.updatedAt).toLocaleString("ja-JP")}</p>
+        </div>
+      </div>
+    </>
+  )
+}
+
+// ── メインページ ─────────────────────────────────
 export default function TasksPage() {
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
   const [activeStatuses, setActiveStatuses] = useState<Set<TaskStatus>>(new Set(ALL_STATUSES))
   const [projectMap, setProjectMap] = useState<Map<number, string>>(new Map())
+  const [projects, setProjects] = useState<Project[]>([])
+  const [selected, setSelected] = useState<Task | null>(null)
 
   const load = useCallback(async () => {
     const [taskRes, projRes] = await Promise.all([
@@ -57,6 +237,7 @@ export default function TasksPage() {
     ])
     setTasks(await taskRes.json())
     const projs: Project[] = await projRes.json()
+    setProjects(projs)
     setProjectMap(new Map(projs.map((p) => [p.id, p.title])))
     setLoading(false)
   }, [])
@@ -67,6 +248,14 @@ export default function TasksPage() {
     window.addEventListener("gtd:captured", load)
     return () => window.removeEventListener("gtd:captured", load)
   }, [load])
+
+  // 保存後にリストが更新されたら選択中タスクも同期する
+  const selectedId = selected?.id
+  useEffect(() => {
+    if (!selectedId) return
+    const updated = tasks.find((t) => t.id === selectedId)
+    if (updated) setSelected(updated)
+  }, [tasks, selectedId])
 
   function toggleStatus(s: TaskStatus) {
     setActiveStatuses((prev) => {
@@ -91,7 +280,21 @@ export default function TasksPage() {
 
   async function deleteTask(id: number) {
     await fetch(`/api/tasks/${id}`, { method: "DELETE" })
+    if (selectedId === id) setSelected(null)
     load()
+  }
+
+  async function handleSave(id: number, fields: Record<string, unknown>) {
+    await fetch(`/api/tasks/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(fields),
+    })
+    await load()
+  }
+
+  function handleSelectTask(task: Task) {
+    setSelected((prev) => (prev?.id === task.id ? null : task))
   }
 
   const filtered = tasks.filter((t) => activeStatuses.has(t.status))
@@ -122,86 +325,133 @@ export default function TasksPage() {
         <span className="text-xs text-gray-400 ml-auto">{filtered.length} 件</span>
       </div>
 
-      {/* タスクリスト */}
-      {loading ? (
-        <p className="text-gray-400 text-sm">読み込み中...</p>
-      ) : filtered.length === 0 ? (
-        <p className="text-gray-400 text-sm">該当するタスクがありません</p>
-      ) : (
-        <ul className="space-y-1.5">
-          {filtered.map((task) => (
-            <li key={task.id} className="bg-white rounded-lg border px-4 py-3">
-              <div className="flex items-start gap-3">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className={`text-xs px-1.5 py-0.5 rounded font-medium shrink-0 ${STATUS_COLOR[task.status]}`}>
-                      {STATUS_LABEL[task.status]}
-                    </span>
-                    {task.projectId && projectMap.has(task.projectId) && (
-                      <span
-                        className="text-xs px-1.5 py-0.5 rounded font-medium shrink-0 bg-indigo-100 text-indigo-700"
-                        title={projectMap.get(task.projectId)}
-                      >
-                        {projectMap.get(task.projectId)!.slice(0, 5)}
-                      </span>
-                    )}
-                    <span className={`text-sm ${task.status === "done" || task.status === "cancelled" ? "line-through text-gray-400" : "text-gray-800"}`}>
-                      {task.title}
-                    </span>
-                  </div>
-                  {task.waitingFor && (
-                    <p className="text-xs text-gray-400 mt-0.5 pl-0.5">→ {task.waitingFor}</p>
-                  )}
-                  {task.status === "scheduled" && task.scheduledAt && (
-                    <p className={`text-xs mt-0.5 pl-0.5 ${task.scheduledAt <= Date.now() ? "text-red-500" : "text-cyan-600"}`}>
-                      {task.scheduledAt <= Date.now() ? "⚠ 期限超過 " : "🕐 "}{formatDate(task.scheduledAt)}
-                    </p>
-                  )}
-                  {task.notes && (
-                    <p className="text-xs text-gray-400 mt-0.5 pl-0.5 truncate">{task.notes}</p>
-                  )}
-                </div>
+      {/* メインレイアウト: PC=横並び / モバイル=縦 */}
+      <div className="md:flex md:gap-4 md:items-start">
 
-                {/* アクションボタン */}
-                <div className="flex gap-1.5 shrink-0">
-                  {task.status === "delegate" && (
-                    <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => moveTo(task.id, "waiting")}>
-                      依頼済み→Waiting
-                    </Button>
-                  )}
-                  {task.status === "someday" && (
-                    <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => moveTo(task.id, "next")}>
-                      昇格→Next
-                    </Button>
-                  )}
-                  {task.status === "scheduled" && (
-                    <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => moveTo(task.id, "next")}>
-                      今すぐNext
-                    </Button>
-                  )}
-                  {(task.status !== "done" && task.status !== "cancelled") && (
-                    <button
-                      onClick={() => moveTo(task.id, "done")}
-                      className="w-6 h-6 mt-0.5 rounded-full border-2 border-gray-300 hover:border-green-500 hover:bg-green-50 flex items-center justify-center text-xs text-transparent hover:text-green-500 transition-colors"
-                      aria-label="Done"
-                    >
-                      ✓
-                    </button>
-                  )}
-                  {(task.status === "done" || task.status === "cancelled") && (
-                    <button
-                      onClick={() => deleteTask(task.id)}
-                      className="w-6 h-6 mt-0.5 rounded border border-gray-200 hover:border-red-400 hover:bg-red-50 flex items-center justify-center text-gray-300 hover:text-red-500 text-xs transition-colors"
-                      aria-label="削除"
-                    >
-                      ×
-                    </button>
-                  )}
-                </div>
-              </div>
-            </li>
-          ))}
-        </ul>
+        {/* タスクリスト */}
+        <div className={`flex-1 min-w-0 ${selected ? "pb-96 md:pb-0" : ""}`}>
+          {loading ? (
+            <p className="text-gray-400 text-sm">読み込み中...</p>
+          ) : filtered.length === 0 ? (
+            <p className="text-gray-400 text-sm">該当するタスクがありません</p>
+          ) : (
+            <ul className="space-y-1.5">
+              {filtered.map((task) => (
+                <li
+                  key={task.id}
+                  onClick={() => handleSelectTask(task)}
+                  className={`bg-white rounded-lg border px-4 py-3 cursor-pointer transition-colors ${
+                    selected?.id === task.id
+                      ? "border-blue-400 ring-1 ring-blue-400 bg-blue-50/30"
+                      : "hover:border-gray-300"
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className={`text-xs px-1.5 py-0.5 rounded font-medium shrink-0 ${STATUS_COLOR[task.status]}`}>
+                          {STATUS_LABEL[task.status]}
+                        </span>
+                        {task.projectId && projectMap.has(task.projectId) && (
+                          <span
+                            className="text-xs px-1.5 py-0.5 rounded font-medium shrink-0 bg-indigo-100 text-indigo-700"
+                            title={projectMap.get(task.projectId)}
+                          >
+                            {projectMap.get(task.projectId)!.slice(0, 5)}
+                          </span>
+                        )}
+                        <span className={`text-sm ${task.status === "done" || task.status === "cancelled" ? "line-through text-gray-400" : "text-gray-800"}`}>
+                          {task.title}
+                        </span>
+                      </div>
+                      {task.waitingFor && (
+                        <p className="text-xs text-gray-400 mt-0.5 pl-0.5">→ {task.waitingFor}</p>
+                      )}
+                      {task.status === "scheduled" && task.scheduledAt && (
+                        <p className={`text-xs mt-0.5 pl-0.5 ${task.scheduledAt <= Date.now() ? "text-red-500" : "text-cyan-600"}`}>
+                          {task.scheduledAt <= Date.now() ? "⚠ 期限超過 " : "🕐 "}{formatDate(task.scheduledAt)}
+                        </p>
+                      )}
+                      {task.notes && (
+                        <p className="text-xs text-gray-400 mt-0.5 pl-0.5 truncate">{task.notes}</p>
+                      )}
+                    </div>
+
+                    {/* アクションボタン（クリックがリスト選択に伝播しないよう止める） */}
+                    <div className="flex gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                      {task.status === "delegate" && (
+                        <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => moveTo(task.id, "waiting")}>
+                          依頼済み→Waiting
+                        </Button>
+                      )}
+                      {task.status === "someday" && (
+                        <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => moveTo(task.id, "next")}>
+                          昇格→Next
+                        </Button>
+                      )}
+                      {task.status === "scheduled" && (
+                        <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => moveTo(task.id, "next")}>
+                          今すぐNext
+                        </Button>
+                      )}
+                      {(task.status !== "done" && task.status !== "cancelled") && (
+                        <button
+                          onClick={() => moveTo(task.id, "done")}
+                          className="w-6 h-6 mt-0.5 rounded-full border-2 border-gray-300 hover:border-green-500 hover:bg-green-50 flex items-center justify-center text-xs text-transparent hover:text-green-500 transition-colors"
+                          aria-label="Done"
+                        >
+                          ✓
+                        </button>
+                      )}
+                      {(task.status === "done" || task.status === "cancelled") && (
+                        <button
+                          onClick={() => deleteTask(task.id)}
+                          className="w-6 h-6 mt-0.5 rounded border border-gray-200 hover:border-red-400 hover:bg-red-50 flex items-center justify-center text-gray-300 hover:text-red-500 text-xs transition-colors"
+                          aria-label="削除"
+                        >
+                          ×
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        {/* PC: 右サイドパネル */}
+        {selected && (
+          <div
+            className="hidden md:flex flex-col w-96 shrink-0 sticky top-4 bg-white border rounded-xl shadow-sm overflow-hidden"
+            style={{ maxHeight: "calc(100vh - 6rem)" }}
+          >
+            <TaskDetailPanel
+              task={selected}
+              projects={projects}
+              onClose={() => setSelected(null)}
+              onSave={handleSave}
+            />
+          </div>
+        )}
+      </div>
+
+      {/* モバイル: バックドロップ + ボトムシート */}
+      {selected && (
+        <>
+          <div
+            className="md:hidden fixed inset-0 bg-black/20 z-[39]"
+            onClick={() => setSelected(null)}
+          />
+          <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t shadow-2xl flex flex-col max-h-[70vh]">
+            <TaskDetailPanel
+              task={selected}
+              projects={projects}
+              onClose={() => setSelected(null)}
+              onSave={handleSave}
+            />
+          </div>
+        </>
       )}
     </div>
   )
