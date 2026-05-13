@@ -221,6 +221,7 @@ function TodayCalendarTab() {
   const [nextTasks, setNextTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
   const [dragging, setDragging] = useState<Task | null>(null)
+  const [selected, setSelected] = useState<Task | null>(null)
 
   async function load() {
     const [todayRes, nextRes] = await Promise.all([fetch("/api/today"), fetch("/api/tasks?status=next")])
@@ -264,23 +265,102 @@ function TodayCalendarTab() {
     })
   }
 
+  function handleTaskTap(task: Task) {
+    setSelected((prev) => (prev?.id === task.id ? null : task))
+  }
+
+  function handleSlotTap(slotIndex: number, occupied: boolean) {
+    if (!selected || occupied) return
+    assign(selected, slotIndex)
+    setSelected(null)
+  }
+
+  const unscheduled = nextTasks.filter((t) => t.todayStart == null)
+
   if (loading) return <p className="text-gray-400 text-sm">読み込み中...</p>
 
   return (
-    <div className="flex gap-6">
-      {/* カレンダー */}
-      <div className="flex-1">
+    <div className="flex flex-col md:flex-row md:gap-6 gap-4">
+
+      {/* Next Actions ── mobile:上段横スクロール, desktop:右サイドバー */}
+      <div
+        className="md:w-56 md:order-2"
+        onDragOver={(e) => e.preventDefault()}
+        onDrop={(e) => { e.preventDefault(); if (dragging) unassign(dragging) }}
+      >
+        <p className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-2">Next Actions</p>
+        <p className="hidden md:block text-xs text-gray-400 mb-3">ドラッグして配置・ここに戻して解除</p>
+        <p className="md:hidden text-xs text-gray-400 mb-2">タップして選択 → スロットをタップして配置</p>
+
+        {/* mobile: 横スクロール strip */}
+        <div className="flex md:flex-col gap-2 overflow-x-auto md:overflow-x-visible pb-1 md:pb-0">
+          {unscheduled.length === 0 ? (
+            <p className="text-xs text-gray-400 shrink-0">すべて配置済み</p>
+          ) : (
+            unscheduled.map((task) => (
+              <div
+                key={task.id}
+                draggable
+                onDragStart={() => { setDragging(task); setSelected(null) }}
+                onDragEnd={() => setDragging(null)}
+                onClick={() => handleTaskTap(task)}
+                className={`shrink-0 md:shrink-[unset] w-36 md:w-auto bg-white border rounded px-3 py-2 text-sm cursor-pointer select-none transition-all ${
+                  ENERGY_COLOR[task.energy ?? ""] ?? "border-gray-200"
+                } ${selected?.id === task.id ? "ring-2 ring-blue-500 ring-offset-1" : ""}`}
+              >
+                <p className="font-medium text-xs leading-snug line-clamp-2">{task.title}</p>
+                <p className="text-xs text-gray-400 mt-0.5">{task.durationMin}分</p>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      {/* カレンダー ── desktop:左, mobile:下 */}
+      <div className="flex-1 md:order-1">
+        {/* 選択中バナー */}
+        {selected && (
+          <div className="mb-2 flex items-center justify-between gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+            <span className="text-sm text-blue-700 truncate min-w-0">
+              <span className="font-medium">「{selected.title}」</span>
+              {selected.todayStart != null ? "を移動するスロットをタップ" : "を配置するスロットをタップ"}
+            </span>
+            <div className="flex items-center gap-2 shrink-0">
+              {selected.todayStart != null && (
+                <button
+                  type="button"
+                  onClick={() => { unassign(selected); setSelected(null) }}
+                  className="text-xs text-blue-600 hover:text-blue-800 underline whitespace-nowrap"
+                >
+                  リストへ戻す
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setSelected(null)}
+                className="text-blue-400 hover:text-blue-600 text-base leading-none"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="bg-white border rounded-lg overflow-hidden">
           {Array.from({ length: SLOTS }, (_, i) => {
             const task = taskAtSlot(i)
             const isStart = task != null && msToSlot(task.todayStart!) === i
             const isContinue = task != null && !isStart
+            const tappable = !!selected && !task
             return (
               <div
                 key={i}
-                className={`flex border-b last:border-b-0 min-h-[40px] ${isContinue ? "hidden" : ""}`}
+                className={`flex border-b last:border-b-0 min-h-[40px] ${isContinue ? "hidden" : ""} ${
+                  tappable ? "cursor-pointer hover:bg-blue-50 active:bg-blue-100" : ""
+                }`}
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={(e) => { e.preventDefault(); if (dragging) assign(dragging, i) }}
+                onClick={() => handleSlotTap(i, !!task)}
               >
                 <div className="w-14 px-2 py-2 text-xs text-gray-400 border-r shrink-0 flex items-start">
                   {slotToTime(i)}
@@ -288,16 +368,29 @@ function TodayCalendarTab() {
                 {isStart && task ? (
                   <div
                     draggable
-                    onDragStart={() => setDragging(task)}
+                    onDragStart={() => { setDragging(task); setSelected(null) }}
                     onDragEnd={() => setDragging(null)}
-                    className={`flex-1 px-2 py-1 m-1 rounded text-xs border cursor-grab active:cursor-grabbing ${ENERGY_COLOR[task.energy ?? "mid"] ?? "bg-gray-100"}`}
+                    onClick={(e) => { e.stopPropagation(); handleTaskTap(task) }}
+                    className={`flex-1 px-2 py-1 m-1 rounded text-xs border cursor-pointer md:cursor-grab md:active:cursor-grabbing transition-all ${
+                      ENERGY_COLOR[task.energy ?? "mid"] ?? "bg-gray-100"
+                    } ${selected?.id === task.id ? "ring-2 ring-blue-500" : ""}`}
                     style={{ minHeight: `${Math.max(1, Math.ceil(task.durationMin / SLOT_MIN)) * 40 - 8}px` }}
                   >
                     <div className="flex items-start justify-between gap-1">
                       <span className="font-medium line-clamp-2">{task.title}</span>
                       <div className="flex gap-1 shrink-0">
-                        <button onClick={() => done(task)} className="text-green-600 hover:text-green-700 text-xs">✓</button>
-                        <button onClick={() => unassign(task)} className="text-gray-400 hover:text-gray-600 text-xs">✕</button>
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); done(task) }}
+                          className="p-1 text-green-600 hover:text-green-700 text-xs leading-none"
+                          aria-label="完了"
+                        >✓</button>
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); unassign(task) }}
+                          className="p-1 text-gray-400 hover:text-gray-600 text-xs leading-none"
+                          aria-label="解除"
+                        >✕</button>
                       </div>
                     </div>
                     <span className="text-gray-400">{task.durationMin}分</span>
@@ -309,32 +402,6 @@ function TodayCalendarTab() {
         </div>
       </div>
 
-      {/* Next Actions（未スケジュール） */}
-      <div
-        className="w-56"
-        onDragOver={(e) => e.preventDefault()}
-        onDrop={(e) => { e.preventDefault(); if (dragging) unassign(dragging) }}
-      >
-        <p className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-2">Next Actions</p>
-        <p className="text-xs text-gray-400 mb-3">ドラッグして配置・ここに戻して解除</p>
-        <ul className="space-y-2">
-          {nextTasks.filter((t) => t.todayStart == null).map((task) => (
-            <li
-              key={task.id}
-              draggable
-              onDragStart={() => setDragging(task)}
-              onDragEnd={() => setDragging(null)}
-              className={`bg-white border rounded px-3 py-2 text-sm cursor-grab active:cursor-grabbing select-none ${ENERGY_COLOR[task.energy ?? ""] ?? "border-gray-200"}`}
-            >
-              <p className="font-medium text-xs leading-snug">{task.title}</p>
-              <p className="text-xs text-gray-400 mt-0.5">{task.durationMin}分</p>
-            </li>
-          ))}
-          {nextTasks.filter((t) => t.todayStart == null).length === 0 && (
-            <p className="text-xs text-gray-400">すべて配置済み</p>
-          )}
-        </ul>
-      </div>
     </div>
   )
 }

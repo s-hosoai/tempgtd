@@ -88,9 +88,9 @@ export default function InboxPage() {
   }
 
   return (
-    <div className="flex flex-col gap-4 h-full max-w-5xl">
+    <div className="flex flex-col gap-4 max-w-5xl">
       {/* ── 上部: キャプチャ入力 + 対象タスク ── */}
-      <div className="flex gap-4 items-start">
+      <div className="flex flex-col md:flex-row gap-3 md:gap-4 md:items-start">
         {/* キャプチャ入力 */}
         <form onSubmit={handleCapture} className="flex gap-2 flex-1">
           <input
@@ -111,10 +111,10 @@ export default function InboxPage() {
         </form>
 
         {/* 対象タスク表示 */}
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 md:shrink-0">
           <span className="text-xs text-gray-400">Triage対象:</span>
           {selected ? (
-            <span className="text-sm font-semibold text-gray-800 max-w-xs truncate">{selected.title}</span>
+            <span className="text-sm font-semibold text-gray-800 truncate">{selected.title}</span>
           ) : (
             <span className="text-sm text-gray-400">—</span>
           )}
@@ -122,14 +122,14 @@ export default function InboxPage() {
         </div>
       </div>
 
-      {/* ── 下段: Triage (左大) + Inboxリスト (右) ── */}
+      {/* ── 下段: Triage + Inboxリスト ── */}
       {loading ? (
         <p className="text-gray-400 text-sm">読み込み中...</p>
       ) : (
-        <div className="flex gap-6 flex-1 min-h-0">
+        <div className="flex flex-col md:flex-row md:gap-6 gap-6 md:flex-1 md:min-h-0">
 
-          {/* 左: トリアージパネル */}
-          <div className="flex-[3] min-w-0 flex flex-col gap-4">
+          {/* トリアージパネル */}
+          <div className="md:flex-[3] min-w-0 flex flex-col gap-4">
             {!selected ? (
               <div className="flex items-center justify-center h-48 text-gray-400 text-sm border-2 border-dashed rounded-xl">
                 {tasks.length === 0 ? "Inbox Zero! 処理するアイテムがありません" : "右のリストからアイテムを選択してください"}
@@ -166,13 +166,17 @@ export default function InboxPage() {
 
                   <Button
                     size="lg"
-                    className="w-full bg-orange-500 hover:bg-orange-600 text-white text-base"
+                    className="w-full text-base bg-amber-100 hover:bg-amber-200 text-amber-800 border border-amber-300 shadow-none"
                     onClick={() => handleAction("next", true)}
                   >
-                    2分でできる → 今すぐやる（Next 先頭へ）
+                    ⚡ 2分でできる → 今すぐやる（Next 先頭へ）
                   </Button>
 
-                  <Button size="lg" className="w-full text-base" onClick={() => handleAction("next", false)}>
+                  <Button
+                    size="lg"
+                    className="w-full text-base bg-blue-100 hover:bg-blue-200 text-blue-800 border border-blue-300 shadow-none"
+                    onClick={() => handleAction("next", false)}
+                  >
                     Next Action へ
                   </Button>
 
@@ -185,8 +189,7 @@ export default function InboxPage() {
                     />
                     <Button
                       size="lg"
-                      variant="outline"
-                      className="shrink-0"
+                      className="shrink-0 bg-violet-100 hover:bg-violet-200 text-violet-800 border border-violet-300 shadow-none disabled:opacity-40"
                       onClick={() => handleAction("scheduled")}
                       disabled={!scheduledDate}
                     >
@@ -194,7 +197,11 @@ export default function InboxPage() {
                     </Button>
                   </div>
 
-                  <Button size="lg" variant="outline" className="w-full text-base" onClick={() => handleAction("someday")}>
+                  <Button
+                    size="lg"
+                    className="w-full text-base bg-teal-100 hover:bg-teal-200 text-teal-800 border border-teal-300 shadow-none"
+                    onClick={() => handleAction("someday")}
+                  >
                     Someday / Maybe へ
                   </Button>
 
@@ -205,22 +212,33 @@ export default function InboxPage() {
                       placeholder="誰に委譲 / 何を待つか"
                       className="flex-1"
                     />
-                    <Button size="lg" variant="outline" className="shrink-0" onClick={() => handleAction("delegate")}>
+                    <Button
+                      size="lg"
+                      className="shrink-0 bg-yellow-100 hover:bg-yellow-200 text-yellow-800 border border-yellow-300 shadow-none"
+                      onClick={() => handleAction("delegate")}
+                    >
                       Delegate
                     </Button>
-                    <Button size="lg" variant="outline" className="shrink-0" onClick={() => handleAction("waiting")}>
+                    <Button
+                      size="lg"
+                      className="shrink-0 bg-indigo-100 hover:bg-indigo-200 text-indigo-800 border border-indigo-300 shadow-none"
+                      onClick={() => handleAction("waiting")}
+                    >
                       Waiting
                     </Button>
                   </div>
 
                   <div className="flex gap-2">
-                    <Button size="lg" variant="outline" className="flex-1 text-base" onClick={() => handleAction("done")}>
+                    <Button
+                      size="lg"
+                      className="flex-1 text-base bg-green-100 hover:bg-green-200 text-green-800 border border-green-300 shadow-none"
+                      onClick={() => handleAction("done")}
+                    >
                       完了済み / 参照のみ
                     </Button>
                     <Button
                       size="lg"
-                      variant="outline"
-                      className="flex-1 text-base text-red-500 hover:text-red-600"
+                      className="flex-1 text-base bg-red-100 hover:bg-red-200 text-red-700 border border-red-300 shadow-none"
                       onClick={() => handleAction("cancelled")}
                     >
                       不要 / キャンセル
@@ -231,8 +249,8 @@ export default function InboxPage() {
             )}
           </div>
 
-          {/* 右: Inbox リスト */}
-          <div className="flex-[2] min-w-0 flex flex-col gap-2 overflow-y-auto">
+          {/* Inbox リスト */}
+          <div className="md:flex-[2] min-w-0 flex flex-col gap-2 md:overflow-y-auto">
             <p className="text-xs text-gray-400 font-medium uppercase tracking-wide shrink-0">Inbox</p>
             {tasks.length === 0 ? (
               <div className="text-center py-10">

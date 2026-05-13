@@ -1,46 +1,36 @@
 import type { Metadata } from "next"
 import { Geist } from "next/font/google"
-import Link from "next/link"
+import { Sidebar } from "@/components/Sidebar"
+import { MobileHeader } from "@/components/MobileHeader"
 import { GlobalCapture } from "@/components/GlobalCapture"
 import "./globals.css"
 
 const geist = Geist({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "GTD",
+  title: "TempGTD",
   description: "Getting Things Done",
 }
-
-const NAV_ITEMS = [
-  { href: "/inbox",        label: "Inbox" },
-  { href: "/today",        label: "Today" },
-  { href: "/projects",     label: "Projects" },
-  { href: "/tasks",        label: "Tasks" },
-  { href: "/templates",    label: "Templates" },
-  { href: "/review",       label: "Review" },
-]
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ja">
       <body className={`${geist.className} bg-gray-50 text-gray-900 flex min-h-screen flex-col`}>
+        {/* スマホ用ヘッダー */}
+        <MobileHeader />
+
         <div className="flex flex-1 overflow-hidden">
-          <nav className="w-48 shrink-0 bg-white border-r flex flex-col py-4 sticky top-0 h-screen">
-            <Link href="/" className="px-4 py-2 text-base font-bold text-blue-600 hover:text-blue-700 mb-2">
-              TempGTD
-            </Link>
-            {NAV_ITEMS.map(({ href, label }) => (
-              <Link
-                key={href}
-                href={href}
-                className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900"
-              >
-                {label}
-              </Link>
-            ))}
-          </nav>
-          <main className="flex-1 px-8 py-8 overflow-y-auto pb-20">{children}</main>
+          {/* PC用サイドバー */}
+          <Sidebar />
+
+          {/* メインコンテンツ
+              スマホ: 上部ヘッダー(h-14)分だけ pt をとり、下部 Capture バー分 pb を確保
+              PC: サイドバーの横に表示 */}
+          <main className="flex-1 px-4 py-4 md:px-8 md:py-8 overflow-y-auto pt-[calc(3.5rem+1rem)] md:pt-8 pb-36 md:pb-28">
+            {children}
+          </main>
         </div>
+
         <GlobalCapture />
       </body>
     </html>
