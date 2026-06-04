@@ -24,13 +24,13 @@ export function runMigrations() {
     CREATE TABLE IF NOT EXISTS tasks (
       id            INTEGER PRIMARY KEY,
       title         TEXT NOT NULL,
-      status        TEXT NOT NULL DEFAULT 'inbox'
-                    CHECK(status IN ('inbox','next','delegate','waiting','scheduled','someday','done','cancelled')),
+      status        TEXT NOT NULL DEFAULT 'inbox',
       parent_id     INTEGER REFERENCES tasks(id),
       project_id    INTEGER REFERENCES projects(id),
       next_order    REAL,
       waiting_for   TEXT,
       scheduled_at  INTEGER,
+      deferred_until INTEGER,
       today_start   INTEGER,
       duration_min  INTEGER NOT NULL DEFAULT 30,
       context       TEXT NOT NULL DEFAULT '',
@@ -105,6 +105,51 @@ export function runMigrations() {
     if (!colNames.has(col)) {
       sqlite.exec(`ALTER TABLE tasks ADD COLUMN ${col} ${def}`)
     }
+  }
+
+  // status CHECK制約が古い（'idea'を含まない）場合はテーブルを再作成して制約を除去
+  const tasksDDL = (
+    sqlite.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='tasks'").get() as
+      | { sql: string }
+      | undefined
+  )?.sql ?? ""
+  if (tasksDDL.includes("CHECK(status IN") && !tasksDDL.includes("'idea'")) {
+    sqlite.pragma("foreign_keys = OFF")
+    sqlite.exec(`
+      CREATE TABLE tasks_new (
+        id            INTEGER PRIMARY KEY,
+        title         TEXT NOT NULL,
+        status        TEXT NOT NULL DEFAULT 'inbox',
+        parent_id     INTEGER REFERENCES tasks_new(id),
+        project_id    INTEGER REFERENCES projects(id),
+        next_order    REAL,
+        waiting_for   TEXT,
+        scheduled_at  INTEGER,
+        deferred_until INTEGER,
+        today_start   INTEGER,
+        duration_min  INTEGER NOT NULL DEFAULT 30,
+        context       TEXT NOT NULL DEFAULT '',
+        tags          TEXT NOT NULL DEFAULT '',
+        energy        TEXT CHECK(energy IN ('low','mid','high')),
+        notes         TEXT NOT NULL DEFAULT '',
+        created_at    INTEGER NOT NULL,
+        updated_at    INTEGER NOT NULL
+      );
+      INSERT INTO tasks_new
+        SELECT id, title, status, parent_id, project_id, next_order,
+               waiting_for, scheduled_at, deferred_until, today_start,
+               duration_min, context, tags, energy, notes, created_at, updated_at
+        FROM tasks;
+      DROP TABLE tasks;
+      ALTER TABLE tasks_new RENAME TO tasks;
+      CREATE INDEX IF NOT EXISTS idx_tasks_status      ON tasks(status);
+      CREATE INDEX IF NOT EXISTS idx_tasks_parent_id   ON tasks(parent_id);
+      CREATE INDEX IF NOT EXISTS idx_tasks_project_id  ON tasks(project_id);
+      CREATE INDEX IF NOT EXISTS idx_tasks_next_order  ON tasks(next_order);
+      CREATE INDEX IF NOT EXISTS idx_tasks_scheduled   ON tasks(scheduled_at);
+      CREATE INDEX IF NOT EXISTS idx_tasks_today_start ON tasks(today_start);
+    `)
+    sqlite.pragma("foreign_keys = ON")
   }
 
   sqlite.close()

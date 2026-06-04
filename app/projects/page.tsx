@@ -134,6 +134,12 @@ export default function ProjectsPage() {
     load()
   }
 
+  async function handleDelete(id: number, title: string) {
+    if (!confirm(`「${title}」を削除しますか？\n関連タスクのプロジェクト紐付けは解除されます。`)) return
+    await fetch(`/api/projects/${id}`, { method: "DELETE" })
+    load()
+  }
+
   async function handleToTemplate(id: number) {
     const res = await fetch(`/api/projects/${id}/to-template`, { method: "POST" })
     if (res.ok) alert("テンプレートを作成しました")
@@ -199,6 +205,12 @@ export default function ProjectsPage() {
                     className="text-xs text-gray-400 hover:text-green-600"
                   >
                     完了
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleDelete(p.id, p.title) }}
+                    className="text-xs text-gray-400 hover:text-red-600"
+                  >
+                    削除
                   </button>
                 </div>
 

@@ -6,7 +6,7 @@ import { tasks, type Task } from "@/lib/db/schema"
 
 const UpdateTaskSchema = z.object({
   title: z.string().min(1).optional(),
-  status: z.enum(["inbox", "next", "delegate", "waiting", "scheduled", "someday", "done", "cancelled"]).optional(),
+  status: z.enum(["inbox", "next", "delegate", "waiting", "scheduled", "someday", "idea", "done", "cancelled"]).optional(),
   notes: z.string().optional(),
   projectId: z.number().nullable().optional(),
   waitingFor: z.string().nullable().optional(),

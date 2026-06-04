@@ -1,9 +1,10 @@
 "use client"
 
-import { useState, useRef, useEffect, useCallback } from "react"
+import { useState, useRef, useEffect, useCallback, useMemo } from "react"
 import { usePathname } from "next/navigation"
 import { Switch } from "@/components/ui/switch"
 import type { Task, TaskStatus } from "@/lib/db/schema"
+import { parseCapture, parsedCaptureHint } from "@/lib/captureParser"
 
 const PATH_STATUS: Record<string, TaskStatus> = {
   "/inbox": "inbox",
@@ -36,7 +37,11 @@ export function GlobalCapture() {
   const [changeStatus, setChangeStatus] = useState<TaskStatus>("done")
   const [changing, setChanging] = useState(false)
 
-  const targetStatus: TaskStatus = (direct && pageStatus) ? pageStatus : "inbox"
+  const parsed = useMemo(() => parseCapture(title), [title])
+  const hint = useMemo(() => parsedCaptureHint(parsed), [parsed])
+
+  // パーサーがステータスを検出した場合はそちらを優先
+  const targetStatus: TaskStatus = parsed.status ?? ((direct && pageStatus) ? pageStatus : "inbox")
 
   const loadCurrentTask = useCallback(async () => {
     const res = await fetch("/api/tasks?status=next")
@@ -54,19 +59,24 @@ export function GlobalCapture() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!title.trim() || busy) return
+    if (!parsed.title || busy) return
     setBusy(true)
     try {
       await fetch("/api/tasks", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: title.trim(), targetStatus }),
+        body: JSON.stringify({
+          title: parsed.title,
+          targetStatus,
+          twoMinute: parsed.twoMinute,
+          scheduledAt: parsed.scheduledAt,
+          projectName: parsed.projectName,
+        }),
       })
       setTitle("")
       window.dispatchEvent(new CustomEvent("gtd:captured", { detail: { status: targetStatus } }))
     } finally {
       setBusy(false)
-      inputRef.current?.focus()
     }
   }
 
@@ -127,16 +137,15 @@ export function GlobalCapture() {
       </div>
 
       {/* Capture 入力行 */}
-      <form onSubmit={handleSubmit} className="px-3 md:px-6 py-2.5 flex items-center gap-2 md:gap-4">
+      <form onSubmit={handleSubmit} className="px-3 md:px-6 pt-2.5 pb-1.5 flex items-center gap-2 md:gap-4">
         <input
           ref={inputRef}
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Capture... (Enter で追加)"
           className="flex-1 min-w-0 text-base px-3 md:px-4 py-2 md:py-2.5 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 bg-gray-50 placeholder:text-gray-400"
-          disabled={busy}
         />
-        {pageStatus && pageStatus !== "inbox" && (
+        {pageStatus && pageStatus !== "inbox" && !parsed.status && (
           <div className="flex items-center gap-1.5 shrink-0">
             <Switch id="direct" checked={direct} onCheckedChange={setDirect} />
             <label htmlFor="direct" className="hidden md:block text-sm text-gray-500 cursor-pointer select-none whitespace-nowrap">
@@ -150,12 +159,15 @@ export function GlobalCapture() {
         )}
         <button
           type="submit"
-          disabled={busy || !title.trim()}
+          disabled={busy || !parsed.title}
           className="shrink-0 px-3 md:px-5 py-2 md:py-2.5 bg-blue-600 text-white text-sm font-medium rounded-xl hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
         >
           追加
         </button>
       </form>
+      {hint && (
+        <p className="px-3 md:px-6 pb-2 text-xs text-blue-600 font-medium">→ {hint}</p>
+      )}
     </div>
   )
 }

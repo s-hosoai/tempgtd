@@ -1,15 +1,18 @@
 import { NextRequest, NextResponse } from "next/server"
-import { and, eq, asc, desc, isNull, lte, or } from "drizzle-orm"
+import { and, eq, asc, desc, isNull, lte, or, max } from "drizzle-orm"
 import { z } from "zod"
 import { db } from "@/lib/db"
-import { tasks, type Task } from "@/lib/db/schema"
+import { tasks, projects, type Task, type Project } from "@/lib/db/schema"
 import { generateId } from "@/lib/id"
 const CreateTaskSchema = z.object({
   title: z.string().min(1),
   notes: z.string().optional(),
   parentId: z.number().optional(),
   projectId: z.number().optional(),
-  targetStatus: z.enum(["inbox", "next", "delegate", "waiting", "someday"]).optional(),
+  projectName: z.string().optional(),
+  targetStatus: z.enum(["inbox", "next", "delegate", "waiting", "someday", "scheduled", "idea"]).optional(),
+  twoMinute: z.boolean().optional(),
+  scheduledAt: z.number().optional(),
 })
 
 export async function GET(request: NextRequest) {
@@ -46,16 +49,55 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
   }
 
+  const { title, notes, parentId, projectId, projectName, targetStatus, twoMinute, scheduledAt } = parsed.data
+
+  // プロジェクト名からIDを解決（存在しなければ新規作成）
+  let resolvedProjectId = projectId ?? null
+  if (projectName && !resolvedProjectId) {
+    const allProjects = await db.select({ id: projects.id, title: projects.title }).from(projects).where(eq(projects.status, "active"))
+    const lower = projectName.toLowerCase()
+    const found = allProjects.find((p) => p.title.toLowerCase() === lower)
+    if (found) {
+      resolvedProjectId = found.id
+    } else {
+      const pNow = Date.now()
+      const [created] = await db.insert(projects).values({
+        id: generateId(),
+        title: projectName,
+        outcome: "",
+        notes: "",
+        createdAt: pNow,
+        updatedAt: pNow,
+      }).returning() as Project[]
+      resolvedProjectId = created.id
+    }
+  }
+
+  const status = targetStatus ?? "inbox"
+
+  // next ステータス時の nextOrder 計算
+  let nextOrder: number | null = null
+  if (status === "next") {
+    if (twoMinute) {
+      nextOrder = 0
+    } else {
+      const [row] = await db.select({ maxOrder: max(tasks.nextOrder) }).from(tasks).where(eq(tasks.status, "next"))
+      nextOrder = (row?.maxOrder ?? 0) + 1
+    }
+  }
+
   const now = Date.now()
   const result = await db
     .insert(tasks)
     .values({
       id: generateId(),
-      title: parsed.data.title,
-      notes: parsed.data.notes ?? "",
-      parentId: parsed.data.parentId ?? null,
-      projectId: parsed.data.projectId ?? null,
-      status: parsed.data.targetStatus ?? "inbox",
+      title,
+      notes: notes ?? "",
+      parentId: parentId ?? null,
+      projectId: resolvedProjectId,
+      status,
+      nextOrder,
+      scheduledAt: scheduledAt ?? null,
       createdAt: now,
       updatedAt: now,
     })

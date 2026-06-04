@@ -5,11 +5,13 @@ import {
   ListTodo,
   LayoutTemplate,
   ClipboardList,
+  Lightbulb,
 } from "lucide-react"
 
 export const NAV_ITEMS = [
   { href: "/inbox",     label: "Inbox",     icon: Inbox },
   { href: "/today",     label: "Today",     icon: CalendarDays },
+  { href: "/ideas",     label: "Ideas",     icon: Lightbulb },
   { href: "/projects",  label: "Projects",  icon: FolderOpen },
   { href: "/tasks",     label: "Tasks",     icon: ListTodo },
   { href: "/templates", label: "Templates", icon: LayoutTemplate },
