@@ -5,7 +5,7 @@ import { X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import type { Task, TaskStatus, Project } from "@/lib/db/schema"
 
-const ALL_STATUSES: TaskStatus[] = ["inbox", "next", "delegate", "waiting", "scheduled", "someday", "done", "cancelled"]
+const ALL_STATUSES: TaskStatus[] = ["inbox", "next", "delegate", "waiting", "scheduled", "someday", "idea", "done", "cancelled"]
 
 const STATUS_LABEL: Record<TaskStatus, string> = {
   inbox: "Inbox",
@@ -14,6 +14,7 @@ const STATUS_LABEL: Record<TaskStatus, string> = {
   waiting: "Waiting",
   scheduled: "Scheduled",
   someday: "Someday",
+  idea: "Idea",
   done: "Done",
   cancelled: "Cancel",
 }
@@ -25,6 +26,7 @@ const STATUS_COLOR: Record<TaskStatus, string> = {
   waiting:   "bg-yellow-100 text-yellow-700",
   scheduled: "bg-cyan-100 text-cyan-700",
   someday:   "bg-gray-100 text-gray-500",
+  idea:      "bg-amber-100 text-amber-700",
   done:      "bg-green-100 text-green-700",
   cancelled: "bg-red-100 text-red-400",
 }
@@ -36,6 +38,7 @@ const TOGGLE_COLOR: Record<TaskStatus, string> = {
   waiting:   "bg-yellow-400 text-white border-yellow-400",
   scheduled: "bg-cyan-500 text-white border-cyan-500",
   someday:   "bg-gray-400 text-white border-gray-400",
+  idea:      "bg-amber-400 text-white border-amber-400",
   done:      "bg-green-500 text-white border-green-500",
   cancelled: "bg-red-400 text-white border-red-400",
 }

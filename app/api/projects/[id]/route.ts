@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { eq } from "drizzle-orm"
 import { z } from "zod"
 import { db } from "@/lib/db"
-import { projects, type Project } from "@/lib/db/schema"
+import { projects, tasks, type Project } from "@/lib/db/schema"
 
 const UpdateProjectSchema = z.object({
   title: z.string().min(1).optional(),
@@ -51,10 +51,10 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
-  await db
-    .update(projects)
-    .set({ status: "cancelled", updatedAt: Date.now() })
-    .where(eq(projects.id, parseInt(id)))
+  const projectId = parseInt(id)
+  // タスクのプロジェクト紐付けを解除してからプロジェクトを削除
+  await db.update(tasks).set({ projectId: null, updatedAt: Date.now() }).where(eq(tasks.projectId, projectId))
+  await db.delete(projects).where(eq(projects.id, projectId))
 
   return new NextResponse(null, { status: 204 })
 }

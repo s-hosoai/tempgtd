@@ -1,12 +1,13 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { useCapture } from "@/lib/useCapture"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import type { Task, Project } from "@/lib/db/schema"
+import { parseCapture, parsedCaptureHint } from "@/lib/captureParser"
 
 export default function InboxPage() {
   const [tasks, setTasks] = useState<Task[]>([])
@@ -20,6 +21,8 @@ export default function InboxPage() {
   const captureRef = useRef<HTMLInputElement>(null)
   const [projects, setProjects] = useState<Project[]>([])
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null)
+  const captureHint = useMemo(() => parsedCaptureHint(parseCapture(captureTitle)), [captureTitle])
+  const [lastCapture, setLastCapture] = useState<string | null>(null)
 
   const loadTasks = useCallback(async () => {
     const res = await fetch("/api/tasks?status=inbox")
@@ -50,17 +53,31 @@ export default function InboxPage() {
 
   async function handleCapture(e: React.FormEvent) {
     e.preventDefault()
-    if (!captureTitle.trim() || busy) return
+    const p = parseCapture(captureTitle)
+    if (!p.title || busy) return
     setBusy(true)
     await fetch("/api/tasks", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title: captureTitle.trim() }),
+      body: JSON.stringify({
+        title: p.title,
+        targetStatus: p.status,
+        twoMinute: p.twoMinute,
+        scheduledAt: p.scheduledAt,
+        projectName: p.projectName,
+      }),
     })
     setCaptureTitle("")
     setBusy(false)
     captureRef.current?.focus()
-    loadTasks()
+    const capturedStatus = p.status ?? "inbox"
+    window.dispatchEvent(new CustomEvent("gtd:captured", { detail: { status: capturedStatus } }))
+    if (capturedStatus === "inbox") {
+      loadTasks()
+    } else {
+      setLastCapture(captureHint)
+      setTimeout(() => setLastCapture(null), 3000)
+    }
   }
 
   function selectTask(task: Task) {
@@ -72,7 +89,7 @@ export default function InboxPage() {
   }
 
   async function handleAction(
-    status: "next" | "delegate" | "waiting" | "scheduled" | "someday" | "done" | "cancelled",
+    status: "next" | "delegate" | "waiting" | "scheduled" | "someday" | "idea" | "done" | "cancelled",
     twoMinute = false
   ) {
     if (!selected) return
@@ -105,23 +122,30 @@ export default function InboxPage() {
       {/* ── 上部: キャプチャ入力 + 対象タスク ── */}
       <div className="flex flex-col md:flex-row gap-3 md:gap-4 md:items-start">
         {/* キャプチャ入力 */}
-        <form onSubmit={handleCapture} className="flex gap-2 flex-1">
-          <input
-            ref={captureRef}
-            value={captureTitle}
-            onChange={(e) => setCaptureTitle(e.target.value)}
-            placeholder="Inbox へ追加..."
-            disabled={busy}
-            className="flex-1 text-base px-4 py-2.5 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 bg-gray-50 placeholder:text-gray-400"
-          />
-          <button
-            type="submit"
-            disabled={busy || !captureTitle.trim()}
-            className="px-4 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-xl hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-          >
-            追加
-          </button>
-        </form>
+        <div className="flex flex-col gap-1 flex-1">
+          <form onSubmit={handleCapture} className="flex gap-2">
+            <input
+              ref={captureRef}
+              value={captureTitle}
+              onChange={(e) => setCaptureTitle(e.target.value)}
+              placeholder="Inbox へ追加..."
+              className="flex-1 text-base px-4 py-2.5 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 bg-gray-50 placeholder:text-gray-400"
+            />
+            <button
+              type="submit"
+              disabled={busy || !captureTitle.trim()}
+              className="px-4 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-xl hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              追加
+            </button>
+          </form>
+          {captureHint && (
+            <p className="px-1 text-xs text-blue-600 font-medium">→ {captureHint}</p>
+          )}
+          {lastCapture && (
+            <p className="px-1 text-xs text-green-600 font-medium animate-pulse">✓ {lastCapture} に追加しました</p>
+          )}
+        </div>
 
         {/* 対象タスク表示 */}
         <div className="flex items-center gap-2 md:shrink-0">
@@ -216,6 +240,14 @@ export default function InboxPage() {
                     onClick={() => handleAction("someday")}
                   >
                     Someday / Maybe へ
+                  </Button>
+
+                  <Button
+                    size="lg"
+                    className="w-full text-base bg-amber-100 hover:bg-amber-200 text-amber-800 border border-amber-300 shadow-none"
+                    onClick={() => handleAction("idea")}
+                  >
+                    💡 Idea へ（後で見直す）
                   </Button>
 
                   <div className="flex gap-2">
