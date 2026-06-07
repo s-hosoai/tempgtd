@@ -214,7 +214,9 @@ function TaskDetailPanel({
 export default function TasksPage() {
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeStatuses, setActiveStatuses] = useState<Set<TaskStatus>>(new Set(ALL_STATUSES))
+  const [activeStatuses, setActiveStatuses] = useState<Set<TaskStatus>>(
+    new Set(ALL_STATUSES.filter((s) => s !== "done" && s !== "cancelled"))
+  )
   const [projectMap, setProjectMap] = useState<Map<number, string>>(new Map())
   const [projects, setProjects] = useState<Project[]>([])
   const [selected, setSelected] = useState<Task | null>(null)

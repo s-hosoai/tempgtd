@@ -18,6 +18,7 @@ const UpdateTaskSchema = z.object({
   tags: z.string().optional(),     // JSON配列文字列
   energy: z.enum(["low", "mid", "high"]).nullable().optional(),
   twoMinute: z.boolean().optional(),
+  nextOrder: z.number().optional(),
 })
 
 export async function PATCH(
@@ -39,7 +40,7 @@ export async function PATCH(
     updatedAt: Date.now(),
   }
 
-  if (parsed.data.status === "next") {
+  if (parsed.data.status === "next" && parsed.data.nextOrder === undefined) {
     if (twoMinute) {
       updates.nextOrder = 0
     } else {

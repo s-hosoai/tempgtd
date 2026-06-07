@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback, Suspense, useRef } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { GripVertical } from "lucide-react"
 import { useCapture } from "@/lib/useCapture"
 import type { Task } from "@/lib/db/schema"
@@ -204,9 +203,6 @@ function NextActionsTab() {
                   )) } catch { return null } })()}
                 </div>
               </div>
-              {i === 0 && task.nextOrder === 0 && (
-                <Badge className="bg-orange-100 text-orange-700 border-orange-200 text-xs flex-shrink-0">2分</Badge>
-              )}
             </li>
           ))}
         </ul>
