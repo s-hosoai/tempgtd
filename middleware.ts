@@ -15,6 +15,15 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
+  // API キー認証（X-Api-Key ヘッダーまたは Authorization: Bearer）
+  const apiKey = process.env.API_KEY
+  if (apiKey) {
+    const providedKey =
+      request.headers.get("x-api-key") ??
+      request.headers.get("authorization")?.replace(/^Bearer\s+/i, "")
+    if (providedKey === apiKey) return NextResponse.next()
+  }
+
   const expectedToken = await createSessionToken(pass)
 
   // セッションクッキーを確認
@@ -23,7 +32,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
-  // Basic 認証をフォールバックとして確認（API クライアント・curl 向け）
+  // Basic 認証をフォールバックとして確認（curl 向け）
   const authHeader = request.headers.get("authorization")
   if (authHeader?.startsWith("Basic ")) {
     const decoded = atob(authHeader.slice(6))
