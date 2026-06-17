@@ -1,32 +1,49 @@
 import { NextRequest, NextResponse } from "next/server"
+import { SESSION_COOKIE, createSessionToken } from "@/lib/session"
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const user = process.env.AUTH_USER ?? "admin"
   const pass = process.env.AUTH_PASSWORD
 
-  // AUTH_PASSWORD が未設定なら保護しない（ローカル開発用）
+  // AUTH_PASSWORD 未設定はローカル開発用として保護しない
   if (!pass) return NextResponse.next()
 
+  const { pathname } = request.nextUrl
+
+  // ログイン画面・認証 API は除外
+  if (pathname.startsWith("/login") || pathname.startsWith("/api/auth")) {
+    return NextResponse.next()
+  }
+
+  const expectedToken = await createSessionToken(pass)
+
+  // セッションクッキーを確認
+  const sessionToken = request.cookies.get(SESSION_COOKIE)?.value
+  if (sessionToken === expectedToken) {
+    return NextResponse.next()
+  }
+
+  // Basic 認証をフォールバックとして確認（API クライアント・curl 向け）
   const authHeader = request.headers.get("authorization")
   if (authHeader?.startsWith("Basic ")) {
     const decoded = atob(authHeader.slice(6))
     const colon = decoded.indexOf(":")
-    const inputUser = decoded.slice(0, colon)
-    const inputPass = decoded.slice(colon + 1)
-    if (inputUser === user && inputPass === pass) {
+    if (decoded.slice(0, colon) === user && decoded.slice(colon + 1) === pass) {
       return NextResponse.next()
     }
   }
 
-  return new NextResponse("Unauthorized", {
-    status: 401,
-    headers: {
-      "WWW-Authenticate": 'Basic realm="GTD", charset="UTF-8"',
-    },
-  })
+  // API リクエストは 401
+  if (pathname.startsWith("/api/")) {
+    return new NextResponse("Unauthorized", { status: 401 })
+  }
+
+  // ブラウザはログイン画面へリダイレクト
+  const loginUrl = new URL("/login", request.url)
+  loginUrl.searchParams.set("from", pathname)
+  return NextResponse.redirect(loginUrl)
 }
 
 export const config = {
-  // 静的ファイル・画像以外の全リクエストに適用
   matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 }
