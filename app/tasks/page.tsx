@@ -7,6 +7,34 @@ import type { Task, TaskStatus, Project } from "@/lib/db/schema"
 
 const ALL_STATUSES: TaskStatus[] = ["inbox", "next", "delegate", "waiting", "scheduled", "someday", "idea", "done", "cancelled"]
 
+const STATUS_ORDER: Record<TaskStatus, number> = Object.fromEntries(
+  ALL_STATUSES.map((s, i) => [s, i])
+) as Record<TaskStatus, number>
+
+type SortMode = "category" | "updated" | "created"
+
+const SORT_LABEL: Record<SortMode, string> = {
+  category: "カテゴリ順",
+  updated: "更新日時順",
+  created: "作成日時順",
+}
+
+const SORT_MODE_KEY = "gtd:tasks:sortMode"
+
+// カテゴリごとの並び順 → カテゴリ内は既存の状態別デフォルト順に合わせる
+function compareTasks(a: Task, b: Task, mode: SortMode): number {
+  if (mode === "updated") return b.updatedAt - a.updatedAt
+  if (mode === "created") return b.createdAt - a.createdAt
+
+  const statusDiff = STATUS_ORDER[a.status] - STATUS_ORDER[b.status]
+  if (statusDiff !== 0) return statusDiff
+
+  if (a.status === "next") return (a.nextOrder ?? 0) - (b.nextOrder ?? 0)
+  if (a.status === "inbox") return a.createdAt - b.createdAt
+  if (a.status === "done") return b.updatedAt - a.updatedAt
+  return b.createdAt - a.createdAt
+}
+
 const STATUS_LABEL: Record<TaskStatus, string> = {
   inbox: "Inbox",
   next: "Next",
@@ -223,6 +251,17 @@ export default function TasksPage() {
   const [projectMap, setProjectMap] = useState<Map<number, string>>(new Map())
   const [projects, setProjects] = useState<Project[]>([])
   const [selected, setSelected] = useState<Task | null>(null)
+  const [sortMode, setSortMode] = useState<SortMode>("category")
+
+  // 前回のソート設定を復元
+  useEffect(() => {
+    const saved = localStorage.getItem(SORT_MODE_KEY)
+    if (saved === "category" || saved === "updated" || saved === "created") setSortMode(saved)
+  }, [])
+
+  useEffect(() => {
+    localStorage.setItem(SORT_MODE_KEY, sortMode)
+  }, [sortMode])
 
   const load = useCallback(async () => {
     const [taskRes, projRes] = await Promise.all([
@@ -291,7 +330,9 @@ export default function TasksPage() {
     setSelected((prev) => (prev?.id === task.id ? null : task))
   }
 
-  const filtered = tasks.filter((t) => activeStatuses.has(t.status))
+  const filtered = tasks
+    .filter((t) => activeStatuses.has(t.status))
+    .sort((a, b) => compareTasks(a, b, sortMode))
 
   return (
     <div className="space-y-4">
@@ -316,7 +357,16 @@ export default function TasksPage() {
         <span className="w-px h-4 bg-gray-200 mx-1" />
         <button onClick={selectAll} className="text-xs text-blue-500 hover:underline">すべて</button>
         <button onClick={clearAll} className="text-xs text-gray-400 hover:underline">クリア</button>
-        <span className="text-xs text-gray-400 ml-auto">{filtered.length} 件</span>
+        <select
+          value={sortMode}
+          onChange={(e) => setSortMode(e.target.value as SortMode)}
+          className="text-xs px-2 py-1 rounded-full border bg-white text-gray-500 ml-auto focus:outline-none focus:ring-2 focus:ring-blue-400"
+        >
+          {(Object.keys(SORT_LABEL) as SortMode[]).map((m) => (
+            <option key={m} value={m}>{SORT_LABEL[m]}</option>
+          ))}
+        </select>
+        <span className="text-xs text-gray-400">{filtered.length} 件</span>
       </div>
 
       {/* メインレイアウト: PC=横並び / モバイル=縦 */}
