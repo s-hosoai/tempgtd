@@ -1,4 +1,4 @@
-FROM node:20-alpine
+FROM node:22-alpine
 
 # better-sqlite3 のネイティブビルドに必要
 RUN apk add --no-cache python3 make g++
@@ -9,7 +9,7 @@ RUN corepack enable && corepack prepare pnpm@latest --activate
 WORKDIR /app
 
 # 依存関係を先にインストール（キャッシュ効率化）
-COPY package.json pnpm-lock.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
 
 # better-sqlite3 のネイティブバイナリを明示的に再コンパイル
