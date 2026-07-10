@@ -159,6 +159,49 @@ crontab -e
 0 2 * * * sqlite3 /data/gtd/gtd.db .dump > /home/ubuntu/backups/gtd_$(date +\%Y\%m\%d).sql && find /home/ubuntu/backups -name "*.sql" -mtime +7 -delete
 ```
 
+### バックアップファイルのローカルへのダウンロード
+
+```bash
+# 今日のバックアップ
+scp -i ~/.ssh/lightsail_tempgtd.pem ubuntu@<サーバーIP>:/home/ubuntu/backups/gtd_$(date +%Y%m%d).sql ~/Downloads/
+
+# 全バックアップ一括
+scp -i ~/.ssh/lightsail_tempgtd.pem ubuntu@<サーバーIP>:/home/ubuntu/backups/*.sql ~/Downloads/
+```
+
+---
+
+## サーバー移行・復旧手順
+
+### 静的IPの付け替え（推奨）
+
+新インスタンス作成後、Lightsailコンソールで静的IPを旧インスタンスから切り離し → 新インスタンスに紐付けると、DNS・GitHubシークレットの変更が不要。
+
+### バックアップからの復旧
+
+1. README記載のセットアップ手順（Step 1〜6）を完了させる
+2. バックアップファイルを新サーバーに転送:
+
+```bash
+scp -i ~/.ssh/lightsail_tempgtd.pem ~/Downloads/gtd_20260710.sql ubuntu@<新サーバーIP>:/home/ubuntu/
+```
+
+3. **コンテナ起動前に**リストアを実施（先に起動すると空のDBが生成される）:
+
+```bash
+sudo mkdir -p /data/gtd && sudo chown ubuntu:ubuntu /data/gtd
+sqlite3 /data/gtd/gtd.db < /home/ubuntu/gtd_20260710.sql
+
+# 確認
+sqlite3 /data/gtd/gtd.db "SELECT status, COUNT(*) FROM tasks GROUP BY status;"
+```
+
+4. mainブランチにpushしてデプロイ:
+
+```bash
+git commit --allow-empty -m "deploy: 新サーバーへのデプロイ" && git push origin main
+```
+
 ---
 
 ## ローカル開発
