@@ -1,36 +1,171 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# tempgtd
 
-## Getting Started
+GTD（Getting Things Done）タスク管理ツール。Next.js + SQLite構成。
 
-First, run the development server:
+## デプロイ構成
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+```
+git push (main)
+  → GitHub Actions: Dockerビルド → ghcr.io にpush
+  → SSH経由でLightsailサーバーに自動デプロイ
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+URL: `https://tempgtd.ccrlab.click`
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## AWS Lightsail セットアップ手順
 
-## Learn More
+### 1. インスタンス作成
 
-To learn more about Next.js, take a look at the following resources:
+- OS: Ubuntu 24.04 LTS
+- プラン: $10/月（2GB RAM）推奨
+  - **注意**: $5プラン（512MB）はDockerビルド時にOOMで停止するため不向き。スワップ追加で多少改善するが不安定。
+- 静的IPを作成してインスタンスに紐付ける（無料）
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### 2. ファイアウォール設定
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Lightsailコンソール → ネットワーキング → ファイアウォールに以下を追加:
 
-## Deploy on Vercel
+| プロトコル | ポート | 送信元 |
+|-----------|--------|--------|
+| TCP | 80 | `0.0.0.0/0` |
+| TCP | 443 | `0.0.0.0/0` |
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### 3. DNS設定
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Lightsail「Domains & DNS」でAレコードを追加:
+
+| レコード | 値 |
+|---------|-----|
+| A（サブドメインまたは`@`） | 静的IPアドレス |
+
+- **注意**: 「is AWS resource alias」はオフのまま。静的IPを直接指定する場合は不要。
+
+### 4. サーバー初期設定
+
+```bash
+sudo apt update && sudo apt upgrade -y
+curl -fsSL https://get.docker.com | sh
+sudo usermod -aG docker ubuntu
+# 一度ログアウト・再ログイン
+sudo apt install -y nginx certbot python3-certbot-nginx sqlite3
+sudo mkdir -p /data/gtd
+sudo chown ubuntu:ubuntu /data/gtd
+```
+
+#### スワップ追加（任意・$5プランでは必須）
+
+```bash
+sudo fallocate -l 1G /swapfile
+sudo chmod 600 /swapfile
+sudo mkswap /swapfile && sudo swapon /swapfile
+echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+```
+
+### 5. 環境変数ファイル作成
+
+```bash
+cat > /home/ubuntu/.env.production << 'EOF'
+DB_PATH=/data/gtd.db
+NODE_ENV=production
+PORT=3000
+AUTH_USER=admin
+AUTH_PASSWORD=<任意のパスワード>
+API_KEY=<任意のAPIキー>
+EOF
+```
+
+- **注意**: `DB_PATH`はコンテナ内のパス。ボリュームマウントが`-v /data/gtd:/data`のため、ホストの`/data/gtd/gtd.db`がコンテナ内では`/data/gtd.db`になる。
+
+### 6. GitHub Actions設定
+
+#### デプロイ用SSH鍵の生成
+
+```bash
+ssh-keygen -t ed25519 -C "github-actions-deploy" -f ~/.ssh/deploy_key -N ""
+cat ~/.ssh/deploy_key.pub >> ~/.ssh/authorized_keys
+cat ~/.ssh/deploy_key  # 秘密鍵をコピーしてGitHubシークレットに登録
+```
+
+#### GitHubシークレット登録
+
+| シークレット名 | 値 |
+|-------------|-----|
+| `LIGHTSAIL_HOST` | 静的IPアドレス |
+| `LIGHTSAIL_SSH_KEY` | 秘密鍵（`-----BEGIN`から全文） |
+| `GHCR_PAT` | GitHub Classic PAT（`read:packages`スコープ） |
+| `AUTH_PASSWORD` | ログインパスワード |
+
+- **注意**: `LIGHTSAIL_SSH_KEY`には秘密鍵（`.pub`なし）を登録する。公開鍵を登録すると`ssh: no key found`エラーになる。
+- **注意**: `GHCR_PAT`はFine-grainedではなくClassic tokenを使用（`read:packages`スコープ）。
+
+### 7. nginx + SSL設定
+
+```bash
+sudo tee /etc/nginx/sites-available/tempgtd << 'EOF'
+server {
+    listen 80;
+    server_name tempgtd.ccrlab.click;
+
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+EOF
+
+sudo ln -s /etc/nginx/sites-available/tempgtd /etc/nginx/sites-enabled/
+sudo rm -f /etc/nginx/sites-enabled/default
+sudo nginx -t && sudo systemctl reload nginx
+
+# DNSが反映されてから実行
+sudo certbot --nginx -d tempgtd.ccrlab.click
+```
+
+### 8. 初回デプロイ
+
+mainブランチにpushするとGitHub Actionsが自動実行される。  
+GitHub → Actionsタブで進捗を確認できる。
+
+---
+
+## SQLiteバックアップ
+
+### 重要: WALモードの注意点
+
+SQLite WALモードでは`gtd.db`・`gtd.db-shm`・`gtd.db-wal`の3ファイルが存在し、**最新データはWALに書き込まれている**。`gtd.db`単体をコピーすると未チェックポイントのデータが失われる。
+
+安全なバックアップ方法:
+
+```bash
+# .dumpを使う（最も確実）
+sqlite3 /data/gtd/gtd.db .dump > ~/backups/gtd_$(date +%Y%m%d).sql
+```
+
+### 自動バックアップ（cron）
+
+```bash
+mkdir -p /home/ubuntu/backups
+crontab -e
+```
+
+以下を追加（毎日深夜2時・7世代保持）:
+
+```
+0 2 * * * sqlite3 /data/gtd/gtd.db .dump > /home/ubuntu/backups/gtd_$(date +\%Y\%m\%d).sql && find /home/ubuntu/backups -name "*.sql" -mtime +7 -delete
+```
+
+---
+
+## ローカル開発
+
+```bash
+pnpm install
+pnpm dev
+```
+
+`AUTH_PASSWORD`を設定しない場合、認証なしで起動する（開発用）。
