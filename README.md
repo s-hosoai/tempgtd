@@ -186,15 +186,22 @@ scp -i ~/.ssh/lightsail_tempgtd.pem ubuntu@<サーバーIP>:/home/ubuntu/backups
 scp -i ~/.ssh/lightsail_tempgtd.pem ~/Downloads/gtd_20260710.sql ubuntu@<新サーバーIP>:/home/ubuntu/
 ```
 
-3. **コンテナ起動前に**リストアを実施（先に起動すると空のDBが生成される）:
+3. リストアを実施:
 
 ```bash
 sudo mkdir -p /data/gtd && sudo chown ubuntu:ubuntu /data/gtd
+
+# コンテナが既に起動してしまった場合は既存DBを削除してからリストア
+docker stop tempgtd
+rm -f /data/gtd/gtd.db /data/gtd/gtd.db-shm /data/gtd/gtd.db-wal
+
 sqlite3 /data/gtd/gtd.db < /home/ubuntu/gtd_20260710.sql
 
 # 確認
 sqlite3 /data/gtd/gtd.db "SELECT status, COUNT(*) FROM tasks GROUP BY status;"
 ```
+
+> **注意**: コンテナを先に起動すると空のDBとスキーマが生成される。その状態でリストアするとテーブル重複エラーが出るため、必ず既存DBファイルを削除してからリストアする。
 
 4. mainブランチにpushしてデプロイ:
 
