@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react"
 import { useCapture } from "@/lib/useCapture"
+import { api } from "@/lib/api"
 import type { Task } from "@/lib/db/schema"
 
 export default function IdeasPage() {
@@ -14,8 +15,7 @@ export default function IdeasPage() {
   const [notesMap, setNotesMap] = useState<Record<number, string>>({})
 
   const load = useCallback(async () => {
-    const res = await fetch("/api/tasks?status=idea")
-    const data: Task[] = await res.json()
+    const data = await api.get<Task[]>("/api/tasks?status=idea")
     setIdeas(data)
     setNotesMap((prev) => {
       const next = { ...prev }
@@ -27,6 +27,8 @@ export default function IdeasPage() {
     setLoading(false)
   }, [])
 
+  // マウント時の初回fetch（loadは再利用される非同期関数のため静的解析の対象外）
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { load() }, [load])
   useCapture("idea", load)
 
@@ -34,22 +36,14 @@ export default function IdeasPage() {
     e.preventDefault()
     if (!captureTitle.trim() || busy) return
     setBusy(true)
-    await fetch("/api/tasks", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title: captureTitle.trim(), targetStatus: "idea" }),
-    })
+    await api.post("/api/tasks", { title: captureTitle.trim(), targetStatus: "idea" })
     setCaptureTitle("")
     setBusy(false)
     load()
   }
 
   async function saveNotes(id: number) {
-    await fetch(`/api/tasks/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ notes: notesMap[id] ?? "" }),
-    })
+    await api.patch(`/api/tasks/${id}`, { notes: notesMap[id] ?? "" })
   }
 
   function toggleExpand(id: number) {

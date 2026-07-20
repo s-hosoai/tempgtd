@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { ChevronDown, ChevronRight } from "lucide-react"
 import type { Task, Project } from "@/lib/db/schema"
+import { api } from "@/lib/api"
 
 type ProjectWithNext = Project & { hasNextAction: boolean }
 
@@ -73,16 +74,16 @@ export default function ProjectsPage() {
   const [addingTask, setAddingTask] = useState(false)
 
   async function load() {
-    const res = await fetch("/api/projects?status=active")
-    setProjects(await res.json())
+    setProjects(await api.get<ProjectWithNext[]>("/api/projects?status=active"))
     setLoading(false)
   }
 
+  // マウント時の初回fetch（loadは再利用される非同期関数のため静的解析の対象外）
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { load() }, [])
 
   async function loadProjectTasks(projectId: number) {
-    const res = await fetch(`/api/tasks?projectId=${projectId}`)
-    const data: Task[] = await res.json()
+    const data = await api.get<Task[]>(`/api/tasks?projectId=${projectId}`)
     setProjectTasks((prev) => ({ ...prev, [projectId]: data }))
   }
 
@@ -100,11 +101,7 @@ export default function ProjectsPage() {
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault()
     if (!title.trim()) return
-    await fetch("/api/projects", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title: title.trim(), outcome: outcome.trim() }),
-    })
+    await api.post("/api/projects", { title: title.trim(), outcome: outcome.trim() })
     setTitle("")
     setOutcome("")
     setAdding(false)
@@ -115,28 +112,20 @@ export default function ProjectsPage() {
     e.preventDefault()
     if (!newTaskTitle.trim() || addingTask) return
     setAddingTask(true)
-    await fetch("/api/tasks", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title: newTaskTitle.trim(), projectId, targetStatus: "inbox" }),
-    })
+    await api.post("/api/tasks", { title: newTaskTitle.trim(), projectId, targetStatus: "inbox" })
     setNewTaskTitle("")
     setAddingTask(false)
     loadProjectTasks(projectId)
   }
 
   async function handleDone(id: number) {
-    await fetch(`/api/projects/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: "done" }),
-    })
+    await api.patch(`/api/projects/${id}`, { status: "done" })
     load()
   }
 
   async function handleDelete(id: number, title: string) {
     if (!confirm(`「${title}」を削除しますか？\n関連タスクのプロジェクト紐付けは解除されます。`)) return
-    await fetch(`/api/projects/${id}`, { method: "DELETE" })
+    await api.delete(`/api/projects/${id}`)
     load()
   }
 

@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import type { Task, Project } from "@/lib/db/schema"
 import { parseCapture, parsedCaptureHint } from "@/lib/captureParser"
+import { api } from "@/lib/api"
 
 export default function InboxPage() {
   const [tasks, setTasks] = useState<Task[]>([])
@@ -25,8 +26,7 @@ export default function InboxPage() {
   const [lastCapture, setLastCapture] = useState<string | null>(null)
 
   const loadTasks = useCallback(async () => {
-    const res = await fetch("/api/tasks?status=inbox")
-    const data: Task[] = await res.json()
+    const data = await api.get<Task[]>("/api/tasks?status=inbox")
     setTasks(data)
     setSelected((prev) => {
       const still = data.find((t) => t.id === prev?.id)
@@ -42,13 +42,13 @@ export default function InboxPage() {
     setLoading(false)
   }, [])
 
+  // マウント時の初回fetch（loadTasksは再利用される非同期関数のため静的解析の対象外）
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { loadTasks() }, [loadTasks])
   useCapture("inbox", loadTasks)
 
   useEffect(() => {
-    fetch("/api/projects?status=active")
-      .then((r) => r.json())
-      .then(setProjects)
+    api.get<Project[]>("/api/projects?status=active").then(setProjects)
   }, [])
 
   async function handleCapture(e: React.FormEvent) {
@@ -56,16 +56,12 @@ export default function InboxPage() {
     const p = parseCapture(captureTitle)
     if (!p.title || busy) return
     setBusy(true)
-    await fetch("/api/tasks", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        title: p.title,
-        targetStatus: p.status,
-        twoMinute: p.twoMinute,
-        scheduledAt: p.scheduledAt,
-        projectName: p.projectName,
-      }),
+    await api.post("/api/tasks", {
+      title: p.title,
+      targetStatus: p.status,
+      twoMinute: p.twoMinute,
+      scheduledAt: p.scheduledAt,
+      projectName: p.projectName,
     })
     setCaptureTitle("")
     setBusy(false)
@@ -96,11 +92,7 @@ export default function InboxPage() {
     const body: Record<string, unknown> = { status, notes, twoMinute, projectId: selectedProjectId }
     if (status === "waiting" || status === "delegate") body.waitingFor = waitingFor || null
     if (status === "scheduled" && scheduledDate) body.scheduledAt = new Date(scheduledDate).getTime()
-    await fetch(`/api/tasks/${selected.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    })
+    await api.patch(`/api/tasks/${selected.id}`, body)
     await loadTasks()
   }
 
@@ -109,11 +101,7 @@ export default function InboxPage() {
     const tomorrow = new Date()
     tomorrow.setDate(tomorrow.getDate() + 1)
     tomorrow.setHours(0, 0, 0, 0)
-    await fetch(`/api/tasks/${selected.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ deferredUntil: tomorrow.getTime() }),
-    })
+    await api.patch(`/api/tasks/${selected.id}`, { deferredUntil: tomorrow.getTime() })
     await loadTasks()
   }
 

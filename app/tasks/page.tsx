@@ -1,245 +1,21 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react"
-import { X } from "lucide-react"
+import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
+import { TaskDetailPanel } from "@/components/tasks/TaskDetailPanel"
+import { api } from "@/lib/api"
 import type { Task, TaskStatus, Project } from "@/lib/db/schema"
-
-const ALL_STATUSES: TaskStatus[] = ["inbox", "next", "delegate", "waiting", "scheduled", "someday", "idea", "done", "cancelled"]
-
-const STATUS_ORDER: Record<TaskStatus, number> = Object.fromEntries(
-  ALL_STATUSES.map((s, i) => [s, i])
-) as Record<TaskStatus, number>
-
-type SortMode = "category" | "updated" | "created"
-
-const SORT_LABEL: Record<SortMode, string> = {
-  category: "カテゴリ順",
-  updated: "更新日時順",
-  created: "作成日時順",
-}
-
-const SORT_MODE_KEY = "gtd:tasks:sortMode"
-
-// カテゴリごとの並び順 → カテゴリ内は既存の状態別デフォルト順に合わせる
-function compareTasks(a: Task, b: Task, mode: SortMode): number {
-  if (mode === "updated") return b.updatedAt - a.updatedAt
-  if (mode === "created") return b.createdAt - a.createdAt
-
-  const statusDiff = STATUS_ORDER[a.status] - STATUS_ORDER[b.status]
-  if (statusDiff !== 0) return statusDiff
-
-  if (a.status === "next") return (a.nextOrder ?? 0) - (b.nextOrder ?? 0)
-  if (a.status === "inbox") return a.createdAt - b.createdAt
-  if (a.status === "done") return b.updatedAt - a.updatedAt
-  return b.createdAt - a.createdAt
-}
-
-const STATUS_LABEL: Record<TaskStatus, string> = {
-  inbox: "Inbox",
-  next: "Next",
-  delegate: "Delegate",
-  waiting: "Waiting",
-  scheduled: "Scheduled",
-  someday: "Someday",
-  idea: "Idea",
-  done: "Done",
-  cancelled: "Cancel",
-}
-
-const STATUS_COLOR: Record<TaskStatus, string> = {
-  inbox:     "bg-gray-100 text-gray-600",
-  next:      "bg-blue-100 text-blue-700",
-  delegate:  "bg-purple-100 text-purple-700",
-  waiting:   "bg-yellow-100 text-yellow-700",
-  scheduled: "bg-cyan-100 text-cyan-700",
-  someday:   "bg-gray-100 text-gray-500",
-  idea:      "bg-amber-100 text-amber-700",
-  done:      "bg-green-100 text-green-700",
-  cancelled: "bg-red-100 text-red-400",
-}
-
-const TOGGLE_COLOR: Record<TaskStatus, string> = {
-  inbox:     "bg-gray-200 text-gray-700 border-gray-300",
-  next:      "bg-blue-500 text-white border-blue-500",
-  delegate:  "bg-purple-500 text-white border-purple-500",
-  waiting:   "bg-yellow-400 text-white border-yellow-400",
-  scheduled: "bg-cyan-500 text-white border-cyan-500",
-  someday:   "bg-gray-400 text-white border-gray-400",
-  idea:      "bg-amber-400 text-white border-amber-400",
-  done:      "bg-green-500 text-white border-green-500",
-  cancelled: "bg-red-400 text-white border-red-400",
-}
-
-function formatDate(ms: number | null): string {
-  if (!ms) return ""
-  return new Date(ms).toLocaleString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })
-}
-
-// ── タスク詳細パネル ──────────────────────────────
-function TaskDetailPanel({
-  task,
-  projects,
-  onClose,
-  onSave,
-}: {
-  task: Task
-  projects: Project[]
-  onClose: () => void
-  onSave: (id: number, fields: Record<string, unknown>) => Promise<void>
-}) {
-  const [title, setTitle] = useState(task.title)
-  const [status, setStatus] = useState<TaskStatus>(task.status)
-  const [notes, setNotes] = useState(task.notes ?? "")
-  const [projectId, setProjectId] = useState<number | null>(task.projectId ?? null)
-  const [waitingFor, setWaitingFor] = useState(task.waitingFor ?? "")
-  const [durationMin, setDurationMin] = useState(task.durationMin)
-  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle")
-  const skipSaveRef = useRef(true)
-
-  // タスク切り替え時にフィールドをリセット（次の変更検知をスキップ）
-  useEffect(() => {
-    skipSaveRef.current = true
-    setTitle(task.title)
-    setStatus(task.status)
-    setNotes(task.notes ?? "")
-    setProjectId(task.projectId ?? null)
-    setWaitingFor(task.waitingFor ?? "")
-    setDurationMin(task.durationMin)
-  }, [task.id])
-
-  // フィールド変更を検知して600msデバウンス後に自動保存
-  useEffect(() => {
-    if (skipSaveRef.current) {
-      skipSaveRef.current = false
-      return
-    }
-    setSaveState("saving")
-    const timer = setTimeout(async () => {
-      await onSave(task.id, {
-        title,
-        status,
-        notes,
-        projectId,
-        waitingFor: waitingFor || null,
-        durationMin,
-      })
-      setSaveState("saved")
-      setTimeout(() => setSaveState("idle"), 1500)
-    }, 600)
-    return () => clearTimeout(timer)
-  // task.id は skipSaveRef のリセット側で管理するため依存から除外
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [title, status, notes, projectId, waitingFor, durationMin])
-
-  return (
-    <>
-      {/* ヘッダー */}
-      <div className="flex items-center justify-between px-4 py-3 border-b shrink-0">
-        <span className="text-sm font-semibold text-gray-700">タスク詳細</span>
-        <div className="flex items-center gap-3 shrink-0">
-          {saveState === "saving" && <span className="text-xs text-gray-400">保存中...</span>}
-          {saveState === "saved"  && <span className="text-xs text-green-500">✓ 保存済み</span>}
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400"
-            aria-label="閉じる"
-          >
-            <X size={16} />
-          </button>
-        </div>
-      </div>
-
-      {/* スクロール可能なコンテンツ */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 pb-36 md:pb-6">
-        {/* タイトル */}
-        <div>
-          <label className="text-xs font-medium text-gray-500 mb-1 block">タイトル</label>
-          <input
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            className="w-full text-sm px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
-          />
-        </div>
-
-        {/* ステータス */}
-        <div>
-          <label className="text-xs font-medium text-gray-500 mb-1 block">ステータス</label>
-          <select
-            value={status}
-            onChange={(e) => setStatus(e.target.value as TaskStatus)}
-            className="w-full text-sm px-3 py-2 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-400"
-          >
-            {ALL_STATUSES.map((s) => (
-              <option key={s} value={s}>{STATUS_LABEL[s]}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* メモ */}
-        <div>
-          <label className="text-xs font-medium text-gray-500 mb-1 block">メモ</label>
-          <textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            rows={5}
-            placeholder="メモを入力..."
-            className="w-full text-sm px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none"
-          />
-        </div>
-
-        {/* プロジェクト */}
-        <div>
-          <label className="text-xs font-medium text-gray-500 mb-1 block">プロジェクト</label>
-          <select
-            value={projectId ?? ""}
-            onChange={(e) => setProjectId(e.target.value ? Number(e.target.value) : null)}
-            className="w-full text-sm px-3 py-2 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-400"
-          >
-            <option value="">所属なし</option>
-            {projects.map((p) => (
-              <option key={p.id} value={p.id}>{p.title}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* 待ち相手（waiting / delegate のみ） */}
-        {(status === "waiting" || status === "delegate") && (
-          <div>
-            <label className="text-xs font-medium text-gray-500 mb-1 block">誰を待っているか</label>
-            <input
-              value={waitingFor}
-              onChange={(e) => setWaitingFor(e.target.value)}
-              placeholder="名前・件名..."
-              className="w-full text-sm px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
-            />
-          </div>
-        )}
-
-        {/* 見積もり時間 */}
-        <div>
-          <label className="text-xs font-medium text-gray-500 mb-1 block">見積もり時間</label>
-          <select
-            value={durationMin}
-            onChange={(e) => setDurationMin(Number(e.target.value))}
-            className="w-full text-sm px-3 py-2 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-400"
-          >
-            {[30, 60, 90, 120, 180, 240].map((m) => (
-              <option key={m} value={m}>{m}分</option>
-            ))}
-          </select>
-        </div>
-
-        {/* タイムスタンプ */}
-        <div className="text-xs text-gray-400 space-y-0.5 pt-2 border-t">
-          <p>作成: {new Date(task.createdAt).toLocaleString("ja-JP")}</p>
-          <p>更新: {new Date(task.updatedAt).toLocaleString("ja-JP")}</p>
-        </div>
-      </div>
-    </>
-  )
-}
+import {
+  ALL_STATUSES,
+  STATUS_LABEL,
+  STATUS_COLOR,
+  TOGGLE_COLOR,
+  SORT_LABEL,
+  SORT_MODE_KEY,
+  compareTasks,
+  formatDate,
+  type SortMode,
+} from "@/lib/taskStatus"
 
 // ── メインページ ─────────────────────────────────
 export default function TasksPage() {
@@ -252,10 +28,18 @@ export default function TasksPage() {
   const [projects, setProjects] = useState<Project[]>([])
   const [selected, setSelected] = useState<Task | null>(null)
   const [sortMode, setSortMode] = useState<SortMode>("category")
+  const [now, setNow] = useState(() => Date.now())
+
+  // 期限超過表示を定期的に更新する
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 60_000)
+    return () => clearInterval(id)
+  }, [])
 
   // 前回のソート設定を復元
   useEffect(() => {
     const saved = localStorage.getItem(SORT_MODE_KEY)
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (saved === "category" || saved === "updated" || saved === "created") setSortMode(saved)
   }, [])
 
@@ -264,17 +48,18 @@ export default function TasksPage() {
   }, [sortMode])
 
   const load = useCallback(async () => {
-    const [taskRes, projRes] = await Promise.all([
-      fetch("/api/tasks"),
-      fetch("/api/projects?status=active"),
+    const [taskRows, projs] = await Promise.all([
+      api.get<Task[]>("/api/tasks"),
+      api.get<Project[]>("/api/projects?status=active"),
     ])
-    setTasks(await taskRes.json())
-    const projs: Project[] = await projRes.json()
+    setTasks(taskRows)
     setProjects(projs)
     setProjectMap(new Map(projs.map((p) => [p.id, p.title])))
     setLoading(false)
   }, [])
 
+  // マウント時の初回fetch（loadは再利用される非同期関数のため静的解析の対象外）
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { load() }, [load])
 
   useEffect(() => {
@@ -287,6 +72,7 @@ export default function TasksPage() {
   useEffect(() => {
     if (!selectedId) return
     const updated = tasks.find((t) => t.id === selectedId)
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (updated) setSelected(updated)
   }, [tasks, selectedId])
 
@@ -303,26 +89,18 @@ export default function TasksPage() {
   function clearAll() { setActiveStatuses(new Set()) }
 
   async function moveTo(id: number, status: TaskStatus) {
-    await fetch(`/api/tasks/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status }),
-    })
+    await api.patch(`/api/tasks/${id}`, { status })
     load()
   }
 
   async function deleteTask(id: number) {
-    await fetch(`/api/tasks/${id}`, { method: "DELETE" })
+    await api.delete(`/api/tasks/${id}`)
     if (selectedId === id) setSelected(null)
     load()
   }
 
   async function handleSave(id: number, fields: Record<string, unknown>) {
-    await fetch(`/api/tasks/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(fields),
-    })
+    await api.patch(`/api/tasks/${id}`, fields)
     await load()
   }
 
@@ -412,8 +190,8 @@ export default function TasksPage() {
                         <p className="text-xs text-gray-400 mt-0.5 pl-0.5">→ {task.waitingFor}</p>
                       )}
                       {task.status === "scheduled" && task.scheduledAt && (
-                        <p className={`text-xs mt-0.5 pl-0.5 ${task.scheduledAt <= Date.now() ? "text-red-500" : "text-cyan-600"}`}>
-                          {task.scheduledAt <= Date.now() ? "⚠ 期限超過 " : "🕐 "}{formatDate(task.scheduledAt)}
+                        <p className={`text-xs mt-0.5 pl-0.5 ${task.scheduledAt <= now ? "text-red-500" : "text-cyan-600"}`}>
+                          {task.scheduledAt <= now ? "⚠ 期限超過 " : "🕐 "}{formatDate(task.scheduledAt)}
                         </p>
                       )}
                       {task.notes && (

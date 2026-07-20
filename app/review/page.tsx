@@ -4,6 +4,8 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { api } from "@/lib/api"
+import type { Task, Project } from "@/lib/db/schema"
 
 type ReviewType = "daily" | "weekly" | "monthly"
 
@@ -51,12 +53,12 @@ export default function ReviewPage() {
   useEffect(() => {
     async function load() {
       const [inbox, next, delegate, waiting, someday, projects] = await Promise.all([
-        fetch("/api/tasks?status=inbox").then((r) => r.json()),
-        fetch("/api/tasks?status=next").then((r) => r.json()),
-        fetch("/api/tasks?status=delegate").then((r) => r.json()),
-        fetch("/api/tasks?status=waiting").then((r) => r.json()),
-        fetch("/api/tasks?status=someday").then((r) => r.json()),
-        fetch("/api/projects?status=active").then((r) => r.json()),
+        api.get<Task[]>("/api/tasks?status=inbox"),
+        api.get<Task[]>("/api/tasks?status=next"),
+        api.get<Task[]>("/api/tasks?status=delegate"),
+        api.get<Task[]>("/api/tasks?status=waiting"),
+        api.get<Task[]>("/api/tasks?status=someday"),
+        api.get<(Project & { hasNextAction: boolean })[]>("/api/projects?status=active"),
       ])
       setStats({
         inbox: inbox.length,
@@ -64,7 +66,7 @@ export default function ReviewPage() {
         delegate: delegate.length,
         waiting: waiting.length,
         someday: someday.length,
-        stalledProjects: projects.filter((p: { hasNextAction: boolean }) => !p.hasNextAction).length,
+        stalledProjects: projects.filter((p) => !p.hasNextAction).length,
       })
     }
     load()
@@ -73,7 +75,8 @@ export default function ReviewPage() {
   function toggle(i: number) {
     setChecked((prev) => {
       const next = new Set(prev)
-      next.has(i) ? next.delete(i) : next.add(i)
+      if (next.has(i)) next.delete(i)
+      else next.add(i)
       return next
     })
   }

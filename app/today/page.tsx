@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useCallback, Suspense, useRef } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Button } from "@/components/ui/button"
 import { GripVertical } from "lucide-react"
 import { useCapture } from "@/lib/useCapture"
+import { api } from "@/lib/api"
 import type { Task } from "@/lib/db/schema"
 
 // ── カレンダー定数 ──────────────────────────────
@@ -57,20 +57,17 @@ function NextActionsTab() {
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
 
   const loadTasks = useCallback(async () => {
-    const res = await fetch("/api/tasks?status=next")
-    setTasks(await res.json())
+    setTasks(await api.get<Task[]>("/api/tasks?status=next"))
     setLoading(false)
   }, [])
 
+  // マウント時の初回fetch（loadTasksは再利用される非同期関数のため静的解析の対象外）
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { loadTasks() }, [loadTasks])
   useCapture("next", loadTasks)
 
   async function handleDone(id: number) {
-    await fetch(`/api/tasks/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: "done" }),
-    })
+    await api.patch(`/api/tasks/${id}`, { status: "done" })
     loadTasks()
   }
 
@@ -92,13 +89,7 @@ function NextActionsTab() {
     dragIndex.current = null
     setDragOverIndex(null)
     await Promise.all(
-      updated.map((t, i) =>
-        fetch(`/api/tasks/${t.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ nextOrder: i }),
-        })
-      )
+      updated.map((t, i) => api.patch(`/api/tasks/${t.id}`, { nextOrder: i }))
     )
     window.dispatchEvent(new CustomEvent("gtd:captured", { detail: { status: "next" } }))
   }
@@ -220,35 +211,28 @@ function TodayCalendarTab() {
   const [selected, setSelected] = useState<Task | null>(null)
 
   async function load() {
-    const [todayRes, nextRes] = await Promise.all([fetch("/api/today"), fetch("/api/tasks?status=next")])
-    setScheduled(await todayRes.json())
-    setNextTasks(await nextRes.json())
+    const [todayRows, nextRows] = await Promise.all([
+      api.get<Task[]>("/api/today"),
+      api.get<Task[]>("/api/tasks?status=next"),
+    ])
+    setScheduled(todayRows)
+    setNextTasks(nextRows)
     setLoading(false)
   }
+  // マウント時の初回fetch（loadは再利用される非同期関数のため静的解析の対象外）
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { load() }, [])
 
   async function assign(task: Task, slotIndex: number) {
-    await fetch("/api/today", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ taskId: task.id, todayStart: slotToMs(slotIndex), durationMin: task.durationMin }),
-    })
+    await api.post("/api/today", { taskId: task.id, todayStart: slotToMs(slotIndex), durationMin: task.durationMin })
     load()
   }
   async function unassign(task: Task) {
-    await fetch("/api/today", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ taskId: task.id, todayStart: null }),
-    })
+    await api.post("/api/today", { taskId: task.id, todayStart: null })
     load()
   }
   async function done(task: Task) {
-    await fetch(`/api/tasks/${task.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: "done" }),
-    })
+    await api.patch(`/api/tasks/${task.id}`, { status: "done" })
     load()
   }
 

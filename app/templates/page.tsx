@@ -3,9 +3,9 @@
 import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import type { Template, TemplateTask } from "@/lib/db/schema"
+import { api } from "@/lib/api"
 
 type TemplateWithTasks = Template & { tasks: TemplateTask[] }
 
@@ -32,12 +32,10 @@ export default function TemplatesPage() {
 
   const loadTemplates = useCallback(async () => {
     try {
-      const res = await fetch("/api/templates")
-      const rows: Template[] = await res.json()
+      const rows = await api.get<Template[]>("/api/templates")
       const withTasks = await Promise.all(
         rows.map(async (t) => {
-          const tRes = await fetch(`/api/templates/${t.id}/tasks`)
-          const tasks: TemplateTask[] = await tRes.json()
+          const tasks = await api.get<TemplateTask[]>(`/api/templates/${t.id}/tasks`)
           return { ...t, tasks }
         })
       )
@@ -51,15 +49,11 @@ export default function TemplatesPage() {
 
   async function handleCreate() {
     if (!newTitle.trim()) return
-    await fetch("/api/templates", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        title: newTitle.trim(),
-        trigger: newTrigger,
-        cron: newTrigger === "scheduled" && newCron ? newCron : null,
-        targetStatus: newTargetStatus,
-      }),
+    await api.post("/api/templates", {
+      title: newTitle.trim(),
+      trigger: newTrigger,
+      cron: newTrigger === "scheduled" && newCron ? newCron : null,
+      targetStatus: newTargetStatus,
     })
     setNewTitle("")
     setNewCron("")
@@ -71,27 +65,23 @@ export default function TemplatesPage() {
 
   async function handleDelete(id: number) {
     if (!confirm("このテンプレートを削除しますか？")) return
-    await fetch(`/api/templates/${id}`, { method: "DELETE" })
+    await api.delete(`/api/templates/${id}`)
     loadTemplates()
   }
 
   async function handleExpand(id: number) {
     setExpandingId(id)
-    await fetch(`/api/templates/${id}/expand`, { method: "POST" })
+    await api.post(`/api/templates/${id}/expand`)
     setExpandingId(null)
     alert("タスクを展開しました")
   }
 
   async function handleAddTask(templateId: number) {
     if (!newTaskTitle.trim()) return
-    await fetch(`/api/templates/${templateId}/tasks`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        title: newTaskTitle.trim(),
-        offsetType: newTaskOffsetType,
-        offsetRelative: newTaskOffsetType === "relative" ? newTaskOffsetRelative : null,
-      }),
+    await api.post(`/api/templates/${templateId}/tasks`, {
+      title: newTaskTitle.trim(),
+      offsetType: newTaskOffsetType,
+      offsetRelative: newTaskOffsetType === "relative" ? newTaskOffsetRelative : null,
     })
     setNewTaskTitle("")
     setNewTaskOffsetType("none")
@@ -101,7 +91,7 @@ export default function TemplatesPage() {
   }
 
   async function handleDeleteTask(templateId: number, taskId: number) {
-    await fetch(`/api/templates/${templateId}/tasks/${taskId}`, { method: "DELETE" })
+    await api.delete(`/api/templates/${templateId}/tasks/${taskId}`)
     loadTemplates()
   }
 
