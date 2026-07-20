@@ -12,12 +12,21 @@ const START_HOUR = 7
 const END_HOUR = 24
 const SLOT_MIN = 30
 const SLOTS = ((END_HOUR - START_HOUR) * 60) / SLOT_MIN
+const SLOT_HEIGHT_PX = 40
+const NOW_LINE_UPDATE_MS = 5 * 60 * 1000
 
 function slotToTime(slotIndex: number): string {
   const totalMin = START_HOUR * 60 + slotIndex * SLOT_MIN
   const h = Math.floor(totalMin / 60).toString().padStart(2, "0")
   const m = (totalMin % 60).toString().padStart(2, "0")
   return `${h}:${m}`
+}
+/** 現在時刻がカレンダー表示範囲内であれば、グリッド先頭からのpx位置を返す */
+function nowLineOffsetPx(ms: number): number | null {
+  const d = new Date(ms)
+  const minsSinceStart = (d.getHours() - START_HOUR) * 60 + d.getMinutes()
+  if (minsSinceStart < 0 || minsSinceStart >= (END_HOUR - START_HOUR) * 60) return null
+  return (minsSinceStart / SLOT_MIN) * SLOT_HEIGHT_PX
 }
 function msToSlot(ms: number): number {
   const d = new Date(ms)
@@ -209,6 +218,12 @@ function TodayCalendarTab() {
   const [loading, setLoading] = useState(true)
   const [dragging, setDragging] = useState<Task | null>(null)
   const [selected, setSelected] = useState<Task | null>(null)
+  const [nowTick, setNowTick] = useState(() => Date.now())
+
+  useEffect(() => {
+    const id = setInterval(() => setNowTick(Date.now()), NOW_LINE_UPDATE_MS)
+    return () => clearInterval(id)
+  }, [])
 
   async function load() {
     const [todayRows, nextRows] = await Promise.all([
@@ -326,7 +341,17 @@ function TodayCalendarTab() {
           </div>
         )}
 
-        <div className="bg-white border rounded-lg overflow-y-auto md:max-h-[calc(100vh-180px)]">
+        <div className="relative bg-white border rounded-lg overflow-y-auto md:max-h-[calc(100vh-180px)]">
+          {nowLineOffsetPx(nowTick) !== null && (
+            <div
+              className="absolute left-0 right-0 z-10 pointer-events-none"
+              style={{ top: `${nowLineOffsetPx(nowTick)}px` }}
+            >
+              <div className="relative border-t-2 border-red-500">
+                <div className="absolute -left-1 -top-[5px] w-2 h-2 rounded-full bg-red-500" />
+              </div>
+            </div>
+          )}
           {Array.from({ length: SLOTS }, (_, i) => {
             const task = taskAtSlot(i)
             const isStart = task != null && msToSlot(task.todayStart!) === i
