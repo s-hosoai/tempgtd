@@ -3,6 +3,7 @@ import { and, eq, gte, lt, isNotNull } from "drizzle-orm"
 import { z } from "zod"
 import { db } from "@/lib/db"
 import { tasks, type Task } from "@/lib/db/schema"
+import { resetStaleCalendarAssignments } from "@/lib/scheduler"
 
 function todayRange() {
   const start = new Date()
@@ -13,6 +14,9 @@ function todayRange() {
 }
 
 export async function GET() {
+  // 前日以前に配置されたまま未完了のタスクを未割当に差し戻す
+  resetStaleCalendarAssignments()
+
   const { start, end } = todayRange()
   const rows = await db
     .select()
