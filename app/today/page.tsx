@@ -352,12 +352,14 @@ function TodayCalendarTab() {
                     onDragEnd={() => setDragging(null)}
                     onClick={(e) => { e.stopPropagation(); handleTaskTap(task) }}
                     className={`flex-1 px-2 py-1 m-1 rounded text-xs border cursor-pointer md:cursor-grab md:active:cursor-grabbing transition-all ${
-                      ENERGY_COLOR[task.energy ?? "mid"] ?? "bg-gray-100"
+                      task.status === "done"
+                        ? "bg-green-50 border-green-300 text-green-700"
+                        : ENERGY_COLOR[task.energy ?? "mid"] ?? "bg-gray-100"
                     } ${selected?.id === task.id ? "ring-2 ring-blue-500" : ""}`}
                     style={{ minHeight: `${Math.max(1, Math.ceil(task.durationMin / SLOT_MIN)) * 40 - 8}px` }}
                   >
                     <div className="flex items-start justify-between gap-1">
-                      <span className="font-medium line-clamp-2">{task.title}</span>
+                      <span className={`font-medium line-clamp-2 ${task.status === "done" ? "line-through" : ""}`}>{task.title}</span>
                       <div className="flex gap-1 shrink-0">
                         <button
                           type="button"
@@ -373,7 +375,7 @@ function TodayCalendarTab() {
                         >✕</button>
                       </div>
                     </div>
-                    <span className="text-gray-400">{task.durationMin}分</span>
+                    <span className={task.status === "done" ? "text-green-500" : "text-gray-400"}>{task.durationMin}分</span>
                   </div>
                 ) : !task ? <div className="flex-1" /> : null}
               </div>
