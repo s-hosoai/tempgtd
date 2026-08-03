@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, Suspense, useRef } from "react"
+import { useState, useEffect, useCallback, useMemo, Suspense, useRef } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { GripVertical } from "lucide-react"
 import { useCapture } from "@/lib/useCapture"
@@ -36,6 +36,35 @@ function slotToMs(slotIndex: number): number {
   const today = new Date()
   today.setHours(START_HOUR + Math.floor((slotIndex * SLOT_MIN) / 60), (slotIndex * SLOT_MIN) % 60, 0, 0)
   return today.getTime()
+}
+/** タスクの開始スロットとスロット数（表示上の所要枠数） */
+function taskMeta(task: Task): { start: number; span: number } {
+  const start = msToSlot(task.todayStart!)
+  const span = Math.max(1, Math.ceil(task.durationMin / SLOT_MIN))
+  return { start, span }
+}
+/** 時間帯が重なるタスクをまとめてクラスタ化（横並び表示のため） */
+type SlotCluster = { start: number; end: number; tasks: Task[] }
+function buildClusters(scheduled: Task[]): SlotCluster[] {
+  const items = scheduled
+    .filter((t) => t.todayStart != null)
+    .map((t) => {
+      const { start, span } = taskMeta(t)
+      return { task: t, start, end: start + span }
+    })
+    .sort((a, b) => a.start - b.start)
+
+  const clusters: SlotCluster[] = []
+  for (const item of items) {
+    const last = clusters[clusters.length - 1]
+    if (last && item.start < last.end) {
+      last.tasks.push(item.task)
+      last.end = Math.max(last.end, item.end)
+    } else {
+      clusters.push({ start: item.start, end: item.end, tasks: [item.task] })
+    }
+  }
+  return clusters
 }
 
 const ENERGY_COLOR: Record<string, string> = {
@@ -251,13 +280,9 @@ function TodayCalendarTab() {
     load()
   }
 
-  function taskAtSlot(slotIndex: number): Task | undefined {
-    return scheduled.find((t) => {
-      if (t.todayStart == null) return false
-      const tSlot = msToSlot(t.todayStart)
-      const slots = Math.max(1, Math.ceil(t.durationMin / SLOT_MIN))
-      return slotIndex >= tSlot && slotIndex < tSlot + slots
-    })
+  const clusters = useMemo(() => buildClusters(scheduled), [scheduled])
+  function clusterAtSlot(slotIndex: number): SlotCluster | undefined {
+    return clusters.find((c) => slotIndex >= c.start && slotIndex < c.end)
   }
 
   function handleTaskTap(task: Task) {
@@ -353,10 +378,10 @@ function TodayCalendarTab() {
             </div>
           )}
           {Array.from({ length: SLOTS }, (_, i) => {
-            const task = taskAtSlot(i)
-            const isStart = task != null && msToSlot(task.todayStart!) === i
-            const isContinue = task != null && !isStart
-            const tappable = !!selected && !task
+            const cluster = clusterAtSlot(i)
+            const isStart = cluster != null && cluster.start === i
+            const isContinue = cluster != null && !isStart
+            const tappable = !!selected && !cluster
             return (
               <div
                 key={i}
@@ -365,44 +390,61 @@ function TodayCalendarTab() {
                 }`}
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={(e) => { e.preventDefault(); if (dragging) assign(dragging, i) }}
-                onClick={() => handleSlotTap(i, !!task)}
+                onClick={() => handleSlotTap(i, !!cluster)}
               >
                 <div className="w-14 px-2 py-2 text-xs text-gray-400 border-r shrink-0 flex items-start">
                   {slotToTime(i)}
                 </div>
-                {isStart && task ? (
+                {isStart && cluster ? (
                   <div
-                    draggable
-                    onDragStart={() => { setDragging(task); setSelected(null) }}
-                    onDragEnd={() => setDragging(null)}
-                    onClick={(e) => { e.stopPropagation(); handleTaskTap(task) }}
-                    className={`flex-1 px-2 py-1 m-1 rounded text-xs border cursor-pointer md:cursor-grab md:active:cursor-grabbing transition-all ${
-                      task.status === "done"
-                        ? "bg-green-50 border-green-300 text-green-700"
-                        : ENERGY_COLOR[task.energy ?? "mid"] ?? "bg-gray-100"
-                    } ${selected?.id === task.id ? "ring-2 ring-blue-500" : ""}`}
-                    style={{ minHeight: `${Math.max(1, Math.ceil(task.durationMin / SLOT_MIN)) * 40 - 8}px` }}
+                    className="flex-1 relative m-1"
+                    style={{ height: `${(cluster.end - cluster.start) * SLOT_HEIGHT_PX - 8}px` }}
                   >
-                    <div className="flex items-start justify-between gap-1">
-                      <span className={`font-medium line-clamp-2 ${task.status === "done" ? "line-through" : ""}`}>{task.title}</span>
-                      <div className="flex gap-1 shrink-0">
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); done(task) }}
-                          className="p-1 text-green-600 hover:text-green-700 text-xs leading-none"
-                          aria-label="完了"
-                        >✓</button>
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); unassign(task) }}
-                          className="p-1 text-gray-400 hover:text-gray-600 text-xs leading-none"
-                          aria-label="解除"
-                        >✕</button>
-                      </div>
-                    </div>
-                    <span className={task.status === "done" ? "text-green-500" : "text-gray-400"}>{task.durationMin}分</span>
+                    {cluster.tasks.map((task, colIndex) => {
+                      const { start, span } = taskMeta(task)
+                      const widthPct = 100 / cluster.tasks.length
+                      return (
+                        <div
+                          key={task.id}
+                          draggable
+                          onDragStart={() => { setDragging(task); setSelected(null) }}
+                          onDragEnd={() => setDragging(null)}
+                          onClick={(e) => { e.stopPropagation(); handleTaskTap(task) }}
+                          className={`absolute px-2 py-1 rounded text-xs border cursor-pointer md:cursor-grab md:active:cursor-grabbing transition-all overflow-hidden ${
+                            task.status === "done"
+                              ? "bg-green-50 border-green-300 text-green-700"
+                              : ENERGY_COLOR[task.energy ?? "mid"] ?? "bg-gray-100"
+                          } ${selected?.id === task.id ? "ring-2 ring-blue-500" : ""}`}
+                          style={{
+                            top: `${(start - cluster.start) * SLOT_HEIGHT_PX}px`,
+                            height: `${span * SLOT_HEIGHT_PX - 4}px`,
+                            left: `calc(${colIndex * widthPct}% + ${colIndex > 0 ? 2 : 0}px)`,
+                            width: `calc(${widthPct}% - ${cluster.tasks.length > 1 ? 4 : 0}px)`,
+                          }}
+                        >
+                          <div className="flex items-start justify-between gap-1">
+                            <span className={`font-medium line-clamp-2 ${task.status === "done" ? "line-through" : ""}`}>{task.title}</span>
+                            <div className="flex gap-1 shrink-0">
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); done(task) }}
+                                className="p-1 text-green-600 hover:text-green-700 text-xs leading-none"
+                                aria-label="完了"
+                              >✓</button>
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); unassign(task) }}
+                                className="p-1 text-gray-400 hover:text-gray-600 text-xs leading-none"
+                                aria-label="解除"
+                              >✕</button>
+                            </div>
+                          </div>
+                          <span className={task.status === "done" ? "text-green-500" : "text-gray-400"}>{task.durationMin}分</span>
+                        </div>
+                      )
+                    })}
                   </div>
-                ) : !task ? <div className="flex-1" /> : null}
+                ) : !cluster ? <div className="flex-1" /> : null}
               </div>
             )
           })}

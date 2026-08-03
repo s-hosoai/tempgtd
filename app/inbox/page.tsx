@@ -13,6 +13,7 @@ import { api } from "@/lib/api"
 export default function InboxPage() {
   const [tasks, setTasks] = useState<Task[]>([])
   const [selected, setSelected] = useState<Task | null>(null)
+  const [title, setTitle] = useState("")
   const [notes, setNotes] = useState("")
   const [waitingFor, setWaitingFor] = useState("")
   const [scheduledDate, setScheduledDate] = useState("")
@@ -32,6 +33,7 @@ export default function InboxPage() {
       const still = data.find((t) => t.id === prev?.id)
       const next = still ?? data[0] ?? null
       if (next?.id !== prev?.id) {
+        setTitle(next?.title ?? "")
         setNotes(next?.notes ?? "")
         setWaitingFor("")
         setScheduledDate("")
@@ -78,6 +80,7 @@ export default function InboxPage() {
 
   function selectTask(task: Task) {
     setSelected(task)
+    setTitle(task.title)
     setNotes(task.notes ?? "")
     setWaitingFor("")
     setScheduledDate("")
@@ -89,19 +92,31 @@ export default function InboxPage() {
     twoMinute = false
   ) {
     if (!selected) return
-    const body: Record<string, unknown> = { status, notes, twoMinute, projectId: selectedProjectId }
+    const trimmedTitle = title.trim()
+    const body: Record<string, unknown> = {
+      status,
+      title: trimmedTitle || selected.title,
+      notes,
+      twoMinute,
+      projectId: selectedProjectId,
+    }
     if (status === "waiting" || status === "delegate") body.waitingFor = waitingFor || null
     if (status === "scheduled" && scheduledDate) body.scheduledAt = new Date(scheduledDate).getTime()
     await api.patch(`/api/tasks/${selected.id}`, body)
     await loadTasks()
   }
 
-  async function handleSkip() {
+  async function handleSkip(days: number) {
     if (!selected) return
-    const tomorrow = new Date()
-    tomorrow.setDate(tomorrow.getDate() + 1)
-    tomorrow.setHours(0, 0, 0, 0)
-    await api.patch(`/api/tasks/${selected.id}`, { deferredUntil: tomorrow.getTime() })
+    const trimmedTitle = title.trim()
+    const target = new Date()
+    target.setDate(target.getDate() + days)
+    target.setHours(0, 0, 0, 0)
+    await api.patch(`/api/tasks/${selected.id}`, {
+      title: trimmedTitle || selected.title,
+      notes,
+      deferredUntil: target.getTime(),
+    })
     await loadTasks()
   }
 
@@ -163,7 +178,11 @@ export default function InboxPage() {
               <>
                 {/* 現在のタスク + メモ */}
                 <div className="bg-white rounded-xl border p-5">
-                  <p className="text-xl font-bold text-gray-900 mb-3">{selected.title}</p>
+                  <Input
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    className="text-xl font-bold text-gray-900 mb-3 h-auto px-2 py-1.5"
+                  />
                   <Textarea
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
@@ -278,14 +297,24 @@ export default function InboxPage() {
                     </Button>
                   </div>
 
-                  <Button
-                    size="lg"
-                    variant="outline"
-                    className="w-full text-base text-gray-400 hover:text-gray-600 border-dashed"
-                    onClick={handleSkip}
-                  >
-                    翌日へ先送り（Skip）
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      size="lg"
+                      variant="outline"
+                      className="flex-1 text-base text-gray-400 hover:text-gray-600 border-dashed"
+                      onClick={() => handleSkip(1)}
+                    >
+                      翌日へ先送り（Skip）
+                    </Button>
+                    <Button
+                      size="lg"
+                      variant="outline"
+                      className="flex-1 text-base text-gray-400 hover:text-gray-600 border-dashed"
+                      onClick={() => handleSkip(7)}
+                    >
+                      来週へ先送り（Skip）
+                    </Button>
+                  </div>
                 </div>
               </>
             )}
