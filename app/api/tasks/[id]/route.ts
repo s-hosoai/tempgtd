@@ -1,13 +1,41 @@
 import { NextRequest, NextResponse } from "next/server"
-import { eq, max } from "drizzle-orm"
+import { eq, max, inArray } from "drizzle-orm"
 import { z } from "zod"
 import { db } from "@/lib/db"
 import { tasks, type Task } from "@/lib/db/schema"
+
+// 親タスク完了時、まだ終了していない子孫タスク（ネスト無制限）をすべて完了にする
+async function cascadeCompleteDescendants(rootId: number, now: number) {
+  const all = await db.select({ id: tasks.id, parentId: tasks.parentId, status: tasks.status }).from(tasks)
+  const childrenOf = new Map<number, typeof all>()
+  for (const t of all) {
+    if (t.parentId == null) continue
+    if (!childrenOf.has(t.parentId)) childrenOf.set(t.parentId, [])
+    childrenOf.get(t.parentId)!.push(t)
+  }
+
+  const toComplete: number[] = []
+  const stack = [rootId]
+  while (stack.length > 0) {
+    const id = stack.pop()!
+    for (const child of childrenOf.get(id) ?? []) {
+      stack.push(child.id)
+      if (child.status !== "done" && child.status !== "cancelled") {
+        toComplete.push(child.id)
+      }
+    }
+  }
+
+  if (toComplete.length > 0) {
+    await db.update(tasks).set({ status: "done", updatedAt: now }).where(inArray(tasks.id, toComplete))
+  }
+}
 
 const UpdateTaskSchema = z.object({
   title: z.string().min(1).optional(),
   status: z.enum(["inbox", "next", "delegate", "waiting", "scheduled", "someday", "idea", "done", "cancelled"]).optional(),
   notes: z.string().optional(),
+  parentId: z.number().nullable().optional(),
   projectId: z.number().nullable().optional(),
   waitingFor: z.string().nullable().optional(),
   scheduledAt: z.number().nullable().optional(),
@@ -32,6 +60,10 @@ export async function PATCH(
 
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
+  }
+
+  if (parsed.data.parentId === taskId) {
+    return NextResponse.json({ error: "parentId cannot equal the task's own id" }, { status: 400 })
   }
 
   const { twoMinute, ...fields } = parsed.data
@@ -60,6 +92,10 @@ export async function PATCH(
 
   if (!result[0]) {
     return NextResponse.json({ error: "Not found" }, { status: 404 })
+  }
+
+  if (parsed.data.status === "done") {
+    await cascadeCompleteDescendants(taskId, updates.updatedAt as number)
   }
 
   return NextResponse.json(result[0])

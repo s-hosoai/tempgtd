@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { ChevronDown, ChevronRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { TaskDetailPanel } from "@/components/tasks/TaskDetailPanel"
 import { api } from "@/lib/api"
@@ -17,6 +18,165 @@ import {
   type SortMode,
 } from "@/lib/taskStatus"
 
+// ── タスク行（親子ツリーの1ノード。子を再帰的に描画する） ──────
+function TaskNode({
+  task,
+  depth,
+  childrenOf,
+  isVisible,
+  matchesFilter,
+  collapsedIds,
+  onToggleCollapse,
+  selectedId,
+  onSelect,
+  moveTo,
+  deleteTask,
+  projectMap,
+  now,
+  sortMode,
+}: {
+  task: Task
+  depth: number
+  childrenOf: Map<number, Task[]>
+  isVisible: (t: Task) => boolean
+  matchesFilter: (t: Task) => boolean
+  collapsedIds: Set<number>
+  onToggleCollapse: (id: number) => void
+  selectedId: number | undefined
+  onSelect: (task: Task) => void
+  moveTo: (id: number, status: TaskStatus) => void
+  deleteTask: (id: number) => void
+  projectMap: Map<number, string>
+  now: number
+  sortMode: SortMode
+}) {
+  const children = (childrenOf.get(task.id) ?? [])
+    .filter(isVisible)
+    .sort((a, b) => compareTasks(a, b, sortMode))
+  const isCollapsed = collapsedIds.has(task.id)
+  const isStructuralOnly = !matchesFilter(task)
+
+  return (
+    <li>
+      <div
+        onClick={() => onSelect(task)}
+        style={{ marginLeft: `${depth * 20}px` }}
+        className={`bg-white rounded-lg border px-4 py-3 cursor-pointer transition-colors ${
+          selectedId === task.id
+            ? "border-blue-400 ring-1 ring-blue-400 bg-blue-50/30"
+            : "hover:border-gray-300"
+        } ${isStructuralOnly ? "opacity-50" : ""}`}
+      >
+        <div className="flex items-start gap-2">
+          {children.length > 0 ? (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onToggleCollapse(task.id) }}
+              className="mt-0.5 text-gray-400 hover:text-gray-600 shrink-0"
+              aria-label={isCollapsed ? "展開" : "折りたたむ"}
+            >
+              {isCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+            </button>
+          ) : (
+            <span className="w-[14px] shrink-0" />
+          )}
+
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className={`text-xs px-1.5 py-0.5 rounded font-medium shrink-0 ${STATUS_COLOR[task.status]}`}>
+                {STATUS_LABEL[task.status]}
+              </span>
+              {task.projectId && projectMap.has(task.projectId) && (
+                <span
+                  className="text-xs px-1.5 py-0.5 rounded font-medium shrink-0 bg-indigo-100 text-indigo-700"
+                  title={projectMap.get(task.projectId)}
+                >
+                  {projectMap.get(task.projectId)!.slice(0, 5)}
+                </span>
+              )}
+              <span className={`text-sm ${task.status === "done" || task.status === "cancelled" ? "line-through text-gray-400" : "text-gray-800"}`}>
+                {task.title}
+              </span>
+            </div>
+            {task.waitingFor && (
+              <p className="text-xs text-gray-400 mt-0.5 pl-0.5">→ {task.waitingFor}</p>
+            )}
+            {task.status === "scheduled" && task.scheduledAt && (
+              <p className={`text-xs mt-0.5 pl-0.5 ${task.scheduledAt <= now ? "text-red-500" : "text-cyan-600"}`}>
+                {task.scheduledAt <= now ? "⚠ 期限超過 " : "🕐 "}{formatDate(task.scheduledAt)}
+              </p>
+            )}
+            {task.notes && (
+              <p className="text-xs text-gray-400 mt-0.5 pl-0.5 truncate">{task.notes}</p>
+            )}
+          </div>
+
+          {/* アクションボタン（クリックがリスト選択に伝播しないよう止める） */}
+          <div className="flex gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+            {task.status === "delegate" && (
+              <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => moveTo(task.id, "waiting")}>
+                依頼済み→Waiting
+              </Button>
+            )}
+            {task.status === "someday" && (
+              <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => moveTo(task.id, "next")}>
+                昇格→Next
+              </Button>
+            )}
+            {task.status === "scheduled" && (
+              <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => moveTo(task.id, "next")}>
+                今すぐNext
+              </Button>
+            )}
+            {(task.status !== "done" && task.status !== "cancelled") && (
+              <button
+                onClick={() => moveTo(task.id, "done")}
+                className="w-6 h-6 mt-0.5 rounded-full border-2 border-gray-300 hover:border-green-500 hover:bg-green-50 flex items-center justify-center text-xs text-transparent hover:text-green-500 transition-colors"
+                aria-label="Done"
+              >
+                ✓
+              </button>
+            )}
+            {(task.status === "done" || task.status === "cancelled") && (
+              <button
+                onClick={() => deleteTask(task.id)}
+                className="w-6 h-6 mt-0.5 rounded border border-gray-200 hover:border-red-400 hover:bg-red-50 flex items-center justify-center text-gray-300 hover:text-red-500 text-xs transition-colors"
+                aria-label="削除"
+              >
+                ×
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {!isCollapsed && children.length > 0 && (
+        <ul className="space-y-1.5 mt-1.5">
+          {children.map((c) => (
+            <TaskNode
+              key={c.id}
+              task={c}
+              depth={depth + 1}
+              childrenOf={childrenOf}
+              isVisible={isVisible}
+              matchesFilter={matchesFilter}
+              collapsedIds={collapsedIds}
+              onToggleCollapse={onToggleCollapse}
+              selectedId={selectedId}
+              onSelect={onSelect}
+              moveTo={moveTo}
+              deleteTask={deleteTask}
+              projectMap={projectMap}
+              now={now}
+              sortMode={sortMode}
+            />
+          ))}
+        </ul>
+      )}
+    </li>
+  )
+}
+
 // ── メインページ ─────────────────────────────────
 export default function TasksPage() {
   const [tasks, setTasks] = useState<Task[]>([])
@@ -29,6 +189,7 @@ export default function TasksPage() {
   const [selected, setSelected] = useState<Task | null>(null)
   const [sortMode, setSortMode] = useState<SortMode>("category")
   const [now, setNow] = useState(() => Date.now())
+  const [collapsedIds, setCollapsedIds] = useState<Set<number>>(new Set())
 
   // 期限超過表示を定期的に更新する
   useEffect(() => {
@@ -104,13 +265,43 @@ export default function TasksPage() {
     await load()
   }
 
+  async function handleAddSubtask(parentId: number, title: string) {
+    await api.post("/api/tasks", { title, parentId })
+    await load()
+  }
+
   function handleSelectTask(task: Task) {
     setSelected((prev) => (prev?.id === task.id ? null : task))
   }
 
-  const filtered = tasks
-    .filter((t) => activeStatuses.has(t.status))
+  function toggleCollapse(id: number) {
+    setCollapsedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  // ── 親子ツリー構築 ──
+  // フィルタに一致しないタスクでも、一致する子孫を持つ場合は構造上の祖先として薄く表示する
+  const taskIds = new Set(tasks.map((t) => t.id))
+  const childrenOf = new Map<number, Task[]>()
+  for (const t of tasks) {
+    if (t.parentId == null) continue
+    if (!childrenOf.has(t.parentId)) childrenOf.set(t.parentId, [])
+    childrenOf.get(t.parentId)!.push(t)
+  }
+  function matchesFilter(t: Task) { return activeStatuses.has(t.status) }
+  function hasVisibleDescendant(id: number): boolean {
+    return (childrenOf.get(id) ?? []).some((c) => matchesFilter(c) || hasVisibleDescendant(c.id))
+  }
+  function isVisible(t: Task) { return matchesFilter(t) || hasVisibleDescendant(t.id) }
+
+  const roots = tasks
+    .filter((t) => (t.parentId == null || !taskIds.has(t.parentId)) && isVisible(t))
     .sort((a, b) => compareTasks(a, b, sortMode))
+  const matchCount = tasks.filter(matchesFilter).length
 
   return (
     <div className="space-y-4">
@@ -144,7 +335,7 @@ export default function TasksPage() {
             <option key={m} value={m}>{SORT_LABEL[m]}</option>
           ))}
         </select>
-        <span className="text-xs text-gray-400">{filtered.length} 件</span>
+        <span className="text-xs text-gray-400">{matchCount} 件</span>
       </div>
 
       {/* メインレイアウト: PC=横並び / モバイル=縦 */}
@@ -154,89 +345,28 @@ export default function TasksPage() {
         <div className={`flex-1 min-w-0 ${selected ? "pb-96 md:pb-0" : ""}`}>
           {loading ? (
             <p className="text-gray-400 text-sm">読み込み中...</p>
-          ) : filtered.length === 0 ? (
+          ) : roots.length === 0 ? (
             <p className="text-gray-400 text-sm">該当するタスクがありません</p>
           ) : (
             <ul className="space-y-1.5">
-              {filtered.map((task) => (
-                <li
+              {roots.map((task) => (
+                <TaskNode
                   key={task.id}
-                  onClick={() => handleSelectTask(task)}
-                  className={`bg-white rounded-lg border px-4 py-3 cursor-pointer transition-colors ${
-                    selected?.id === task.id
-                      ? "border-blue-400 ring-1 ring-blue-400 bg-blue-50/30"
-                      : "hover:border-gray-300"
-                  }`}
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className={`text-xs px-1.5 py-0.5 rounded font-medium shrink-0 ${STATUS_COLOR[task.status]}`}>
-                          {STATUS_LABEL[task.status]}
-                        </span>
-                        {task.projectId && projectMap.has(task.projectId) && (
-                          <span
-                            className="text-xs px-1.5 py-0.5 rounded font-medium shrink-0 bg-indigo-100 text-indigo-700"
-                            title={projectMap.get(task.projectId)}
-                          >
-                            {projectMap.get(task.projectId)!.slice(0, 5)}
-                          </span>
-                        )}
-                        <span className={`text-sm ${task.status === "done" || task.status === "cancelled" ? "line-through text-gray-400" : "text-gray-800"}`}>
-                          {task.title}
-                        </span>
-                      </div>
-                      {task.waitingFor && (
-                        <p className="text-xs text-gray-400 mt-0.5 pl-0.5">→ {task.waitingFor}</p>
-                      )}
-                      {task.status === "scheduled" && task.scheduledAt && (
-                        <p className={`text-xs mt-0.5 pl-0.5 ${task.scheduledAt <= now ? "text-red-500" : "text-cyan-600"}`}>
-                          {task.scheduledAt <= now ? "⚠ 期限超過 " : "🕐 "}{formatDate(task.scheduledAt)}
-                        </p>
-                      )}
-                      {task.notes && (
-                        <p className="text-xs text-gray-400 mt-0.5 pl-0.5 truncate">{task.notes}</p>
-                      )}
-                    </div>
-
-                    {/* アクションボタン（クリックがリスト選択に伝播しないよう止める） */}
-                    <div className="flex gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
-                      {task.status === "delegate" && (
-                        <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => moveTo(task.id, "waiting")}>
-                          依頼済み→Waiting
-                        </Button>
-                      )}
-                      {task.status === "someday" && (
-                        <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => moveTo(task.id, "next")}>
-                          昇格→Next
-                        </Button>
-                      )}
-                      {task.status === "scheduled" && (
-                        <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => moveTo(task.id, "next")}>
-                          今すぐNext
-                        </Button>
-                      )}
-                      {(task.status !== "done" && task.status !== "cancelled") && (
-                        <button
-                          onClick={() => moveTo(task.id, "done")}
-                          className="w-6 h-6 mt-0.5 rounded-full border-2 border-gray-300 hover:border-green-500 hover:bg-green-50 flex items-center justify-center text-xs text-transparent hover:text-green-500 transition-colors"
-                          aria-label="Done"
-                        >
-                          ✓
-                        </button>
-                      )}
-                      {(task.status === "done" || task.status === "cancelled") && (
-                        <button
-                          onClick={() => deleteTask(task.id)}
-                          className="w-6 h-6 mt-0.5 rounded border border-gray-200 hover:border-red-400 hover:bg-red-50 flex items-center justify-center text-gray-300 hover:text-red-500 text-xs transition-colors"
-                          aria-label="削除"
-                        >
-                          ×
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </li>
+                  task={task}
+                  depth={0}
+                  childrenOf={childrenOf}
+                  isVisible={isVisible}
+                  matchesFilter={matchesFilter}
+                  collapsedIds={collapsedIds}
+                  onToggleCollapse={toggleCollapse}
+                  selectedId={selected?.id}
+                  onSelect={handleSelectTask}
+                  moveTo={moveTo}
+                  deleteTask={deleteTask}
+                  projectMap={projectMap}
+                  now={now}
+                  sortMode={sortMode}
+                />
               ))}
             </ul>
           )}
@@ -251,8 +381,11 @@ export default function TasksPage() {
             <TaskDetailPanel
               task={selected}
               projects={projects}
+              tasks={tasks}
               onClose={() => setSelected(null)}
               onSave={handleSave}
+              onAddSubtask={handleAddSubtask}
+              onSelectTask={handleSelectTask}
             />
           </div>
         )}
@@ -269,8 +402,11 @@ export default function TasksPage() {
             <TaskDetailPanel
               task={selected}
               projects={projects}
+              tasks={tasks}
               onClose={() => setSelected(null)}
               onSave={handleSave}
+              onAddSubtask={handleAddSubtask}
+              onSelectTask={handleSelectTask}
             />
           </div>
         </>

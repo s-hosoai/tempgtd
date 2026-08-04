@@ -29,6 +29,7 @@ export function GlobalCapture() {
   const pageStatus = PATH_STATUS[pathname] ?? null
 
   const [direct, setDirect] = useState(false)
+  const [subdivide, setSubdivide] = useState(false)
   const [title, setTitle] = useState("")
   const [busy, setBusy] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -71,6 +72,7 @@ export function GlobalCapture() {
           twoMinute: parsed.twoMinute,
           scheduledAt: parsed.scheduledAt,
           projectName: parsed.projectName,
+          parentId: subdivide && currentTask ? currentTask.id : undefined,
         }),
       })
       setTitle("")
@@ -145,18 +147,37 @@ export function GlobalCapture() {
           placeholder="Capture... (Enter で追加)"
           className="flex-1 min-w-0 text-base px-3 md:px-4 py-2 md:py-2.5 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 bg-gray-50 placeholder:text-gray-400"
         />
-        {pageStatus && pageStatus !== "inbox" && !parsed.status && (
-          <div className="flex items-center gap-1.5 shrink-0">
-            <Switch id="direct" checked={direct} onCheckedChange={setDirect} />
-            <label htmlFor="direct" className="hidden md:block text-sm text-gray-500 cursor-pointer select-none whitespace-nowrap">
-              {direct ? (
-                <span className="text-blue-600 font-medium">{STATUS_LABEL[pageStatus]} へ</span>
+        <div className="flex flex-col gap-1 shrink-0">
+          <div className="flex items-center gap-1.5">
+            <Switch id="subdivide" checked={subdivide} onCheckedChange={setSubdivide} disabled={!currentTask} />
+            <label
+              htmlFor="subdivide"
+              className={`hidden md:block text-sm cursor-pointer select-none whitespace-nowrap max-w-[220px] truncate ${
+                currentTask ? "text-gray-500" : "text-gray-300 cursor-not-allowed"
+              }`}
+            >
+              {!currentTask ? (
+                "Next Action なし"
+              ) : subdivide ? (
+                <span className="text-purple-600 font-medium">「{currentTask.title}」の子へ</span>
               ) : (
-                "Inbox へ"
+                "Current Task を細分化"
               )}
             </label>
           </div>
-        )}
+          {pageStatus && pageStatus !== "inbox" && !parsed.status && (
+            <div className="flex items-center gap-1.5">
+              <Switch id="direct" checked={direct} onCheckedChange={setDirect} />
+              <label htmlFor="direct" className="hidden md:block text-sm text-gray-500 cursor-pointer select-none whitespace-nowrap">
+                {direct ? (
+                  <span className="text-blue-600 font-medium">{STATUS_LABEL[pageStatus]} へ</span>
+                ) : (
+                  "Inbox へ"
+                )}
+              </label>
+            </div>
+          )}
+        </div>
         <button
           type="submit"
           disabled={busy || !parsed.title}

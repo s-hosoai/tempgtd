@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import type { Task, Project } from "@/lib/db/schema"
 import { parseCapture, parsedCaptureHint } from "@/lib/captureParser"
 import { api } from "@/lib/api"
+import { STATUS_LABEL, STATUS_COLOR, collectDescendantIds } from "@/lib/taskStatus"
 
 export default function InboxPage() {
   const [tasks, setTasks] = useState<Task[]>([])
@@ -25,6 +26,19 @@ export default function InboxPage() {
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null)
   const captureHint = useMemo(() => parsedCaptureHint(parseCapture(captureTitle)), [captureTitle])
   const [lastCapture, setLastCapture] = useState<string | null>(null)
+  const [allTasks, setAllTasks] = useState<Task[]>([])
+  const [parentTaskId, setParentTaskId] = useState<number | null>(null)
+  const parentCandidates = allTasks.filter((t) => t.status !== "done" && t.status !== "cancelled")
+  const [triageParentId, setTriageParentId] = useState<number | null>(null)
+  const [newSubtaskTitle, setNewSubtaskTitle] = useState("")
+  const triageDescendantIds = useMemo(
+    () => (selected ? collectDescendantIds(selected.id, allTasks) : new Set<number>()),
+    [selected, allTasks]
+  )
+  const triageChildren = useMemo(
+    () => (selected ? allTasks.filter((t) => t.parentId === selected.id) : []),
+    [selected, allTasks]
+  )
 
   const loadTasks = useCallback(async () => {
     const data = await api.get<Task[]>("/api/tasks?status=inbox")
@@ -38,11 +52,12 @@ export default function InboxPage() {
         setWaitingFor("")
         setScheduledDate("")
         setSelectedProjectId(next?.projectId ?? null)
+        setTriageParentId(next?.parentId ?? null)
       }
       return next
     })
     setLoading(false)
-  }, [])
+  }, [setTriageParentId])
 
   // マウント時の初回fetch（loadTasksは再利用される非同期関数のため静的解析の対象外）
   // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -52,6 +67,17 @@ export default function InboxPage() {
   useEffect(() => {
     api.get<Project[]>("/api/projects?status=active").then(setProjects)
   }, [])
+
+  const loadAllTasks = useCallback(async () => {
+    setAllTasks(await api.get<Task[]>("/api/tasks"))
+  }, [])
+  // マウント時の初回fetch（loadAllTasksは再利用される非同期関数のため静的解析の対象外）
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { loadAllTasks() }, [loadAllTasks])
+  useEffect(() => {
+    window.addEventListener("gtd:captured", loadAllTasks)
+    return () => window.removeEventListener("gtd:captured", loadAllTasks)
+  }, [loadAllTasks])
 
   async function handleCapture(e: React.FormEvent) {
     e.preventDefault()
@@ -64,6 +90,7 @@ export default function InboxPage() {
       twoMinute: p.twoMinute,
       scheduledAt: p.scheduledAt,
       projectName: p.projectName,
+      parentId: parentTaskId ?? undefined,
     })
     setCaptureTitle("")
     setBusy(false)
@@ -85,6 +112,7 @@ export default function InboxPage() {
     setWaitingFor("")
     setScheduledDate("")
     setSelectedProjectId(task.projectId ?? null)
+    setTriageParentId(task.parentId ?? null)
   }
 
   async function handleAction(
@@ -99,6 +127,7 @@ export default function InboxPage() {
       notes,
       twoMinute,
       projectId: selectedProjectId,
+      parentId: triageParentId,
     }
     if (status === "waiting" || status === "delegate") body.waitingFor = waitingFor || null
     if (status === "scheduled" && scheduledDate) body.scheduledAt = new Date(scheduledDate).getTime()
@@ -115,9 +144,20 @@ export default function InboxPage() {
     await api.patch(`/api/tasks/${selected.id}`, {
       title: trimmedTitle || selected.title,
       notes,
+      parentId: triageParentId,
       deferredUntil: target.getTime(),
     })
     await loadTasks()
+  }
+
+  async function handleAddSubtask(e: React.FormEvent) {
+    e.preventDefault()
+    if (!selected) return
+    const t = newSubtaskTitle.trim()
+    if (!t) return
+    setNewSubtaskTitle("")
+    await api.post("/api/tasks", { title: t, parentId: selected.id })
+    await Promise.all([loadTasks(), loadAllTasks()])
   }
 
   return (
@@ -142,6 +182,20 @@ export default function InboxPage() {
               追加
             </button>
           </form>
+          <div className="flex items-center gap-1.5 px-1">
+            <label htmlFor="parentTask" className="text-xs text-gray-400 shrink-0">親タスク（任意）:</label>
+            <select
+              id="parentTask"
+              value={parentTaskId ?? ""}
+              onChange={(e) => setParentTaskId(e.target.value ? Number(e.target.value) : null)}
+              className="text-xs px-2 py-1 border rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-blue-400 max-w-[220px]"
+            >
+              <option value="">なし</option>
+              {parentCandidates.map((t) => (
+                <option key={t.id} value={t.id}>{t.title}</option>
+              ))}
+            </select>
+          </div>
           {captureHint && (
             <p className="px-1 text-xs text-blue-600 font-medium">→ {captureHint}</p>
           )}
@@ -201,6 +255,62 @@ export default function InboxPage() {
                         <option key={p.id} value={p.id}>{p.title}</option>
                       ))}
                     </select>
+                  </div>
+
+                  {/* 親タスク */}
+                  <div className="mt-3">
+                    <label className="text-xs text-gray-500 mb-1 block">親タスク</label>
+                    <select
+                      value={triageParentId ?? ""}
+                      onChange={(e) => setTriageParentId(e.target.value ? Number(e.target.value) : null)}
+                      className="w-full text-sm px-3 py-2 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    >
+                      <option value="">なし</option>
+                      {allTasks
+                        .filter((t) => t.id !== selected.id && !triageDescendantIds.has(t.id))
+                        .map((t) => (
+                          <option key={t.id} value={t.id}>{t.title}</option>
+                        ))}
+                    </select>
+                  </div>
+
+                  {/* 子タスク（分割） */}
+                  <div className="mt-3">
+                    <label className="text-xs text-gray-500 mb-1 block">
+                      子タスク（{triageChildren.length}）
+                    </label>
+                    {triageChildren.length > 0 && (
+                      <ul className="space-y-1 mb-2">
+                        {triageChildren.map((c) => (
+                          <li
+                            key={c.id}
+                            className="flex items-center gap-2 text-sm px-2 py-1.5 border rounded-lg"
+                          >
+                            <span className={`text-xs px-1.5 py-0.5 rounded font-medium shrink-0 ${STATUS_COLOR[c.status]}`}>
+                              {STATUS_LABEL[c.status]}
+                            </span>
+                            <span className={`flex-1 min-w-0 truncate ${c.status === "done" || c.status === "cancelled" ? "line-through text-gray-400" : ""}`}>
+                              {c.title}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    <form onSubmit={handleAddSubtask} className="flex gap-2">
+                      <input
+                        value={newSubtaskTitle}
+                        onChange={(e) => setNewSubtaskTitle(e.target.value)}
+                        placeholder="子タスクを追加..."
+                        className="flex-1 min-w-0 text-sm px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+                      />
+                      <button
+                        type="submit"
+                        disabled={!newSubtaskTitle.trim()}
+                        className="shrink-0 px-3 py-2 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        追加
+                      </button>
+                    </form>
                   </div>
                 </div>
 

@@ -70,3 +70,26 @@ export function formatDate(ms: number | null): string {
   if (!ms) return ""
   return new Date(ms).toLocaleString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })
 }
+
+/** 親を辿ってroot直下の子孫すべてのidを集める（循環参照になる親候補を除外するため） */
+export function collectDescendantIds(rootId: number, all: Task[]): Set<number> {
+  const childrenOf = new Map<number, number[]>()
+  for (const t of all) {
+    if (t.parentId == null) continue
+    const arr = childrenOf.get(t.parentId) ?? []
+    arr.push(t.id)
+    childrenOf.set(t.parentId, arr)
+  }
+  const result = new Set<number>()
+  const stack = [rootId]
+  while (stack.length > 0) {
+    const id = stack.pop()!
+    for (const childId of childrenOf.get(id) ?? []) {
+      if (!result.has(childId)) {
+        result.add(childId)
+        stack.push(childId)
+      }
+    }
+  }
+  return result
+}
